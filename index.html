@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LebotWorld AI教育办公室</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#2C2C3A;overflow:hidden;font-family:'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif}
+#gameCanvas{display:block;cursor:crosshair}
+#hud{position:fixed;top:16px;left:16px;color:#fff;font-size:14px;z-index:10;pointer-events:none}
+#hud .room-name{background:rgba(0,0,0,0.6);padding:6px 14px;border-radius:8px;backdrop-filter:blur(4px);font-size:16px;font-weight:600}
+#controls-hint{position:fixed;bottom:16px;left:calc(50% - 160px);transform:translateX(-50%);color:rgba(255,255,255,0.7);font-size:13px;z-index:10;pointer-events:none;background:rgba(0,0,0,0.45);padding:8px 18px;border-radius:10px;backdrop-filter:blur(4px);white-space:nowrap}
+#dialogBox{position:fixed;bottom:80px;left:calc(50% - 160px);transform:translateX(-50%);background:rgba(30,30,50,0.96);border:2px solid rgba(255,255,255,0.15);border-radius:14px;padding:20px 24px;color:#fff;width:420px;z-index:20;display:none;backdrop-filter:blur(8px)}
+#dialogBox .npc-name{font-size:16px;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+#dialogBox .npc-name .dot{width:10px;height:10px;border-radius:50%;display:inline-block}
+.chat-history{max-height:160px;overflow-y:auto;margin-bottom:10px;padding:8px;background:rgba(0,0,0,0.25);border-radius:8px}
+.chat-msg{margin-bottom:5px;font-size:13px;line-height:1.5}.chat-msg .s{font-weight:700;margin-right:4px}
+.chat-msg.p .s{color:#88CCFF}.chat-msg.n .s{color:#FFB347}
+.chat-input-wrap{display:flex;gap:6px;margin-top:8px}
+.chat-input-wrap input{flex:1;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:6px;padding:6px 10px;color:#fff;font-size:13px;outline:none}
+.chat-input-wrap input:focus{border-color:rgba(255,255,255,0.4)}
+.chat-input-wrap input::placeholder{color:rgba(255,255,255,0.35)}
+.quick-opts{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px}
+.quick-opt{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px;color:rgba(255,255,255,0.75);transition:all .15s}
+.quick-opt:hover{background:rgba(255,255,255,0.18);color:#fff}
+#dialogBox .close-btn{position:absolute;top:8px;right:12px;cursor:pointer;color:rgba(255,255,255,0.4);font-size:18px}
+#dialogBox .close-btn:hover{color:#fff}
+#minimap{position:fixed;top:16px;right:16px;z-index:12;border-radius:10px;overflow:hidden;border:2px solid rgba(255,255,255,0.15);background:rgba(0,0,0,0.5)}
+#social-feed{position:fixed;top:190px;right:16px;width:310px;bottom:16px;z-index:11;display:flex;flex-direction:column;background:rgba(20,20,35,0.92);border:1px solid rgba(255,255,255,0.12);border-radius:12px;backdrop-filter:blur(6px);overflow:hidden}
+.feed-hd{padding:10px 14px;font-size:13px;font-weight:700;color:rgba(255,255,255,0.8);border-bottom:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;gap:6px;flex-shrink:0}
+.feed-hd .dot{width:8px;height:8px;border-radius:50%;background:#50FF50;display:inline-block}
+.feed-bd{flex:1;overflow-y:auto;padding:6px 8px;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,0.15) transparent}
+.feed-bd::-webkit-scrollbar{width:4px}.feed-bd::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.15);border-radius:2px}
+.fm{margin-bottom:6px;font-size:12px;line-height:1.6;color:rgba(255,255,255,0.8);padding:6px 10px;background:rgba(255,255,255,0.04);border-radius:8px;animation:fadeIn .3s ease}
+.fm.chat{background:rgba(255,255,255,0.05)}
+.fm.event{background:rgba(74,144,217,0.12);border-left:3px solid #4A90D9}
+.fm.autopilot{background:rgba(255,215,0,0.08);border-left:3px solid #FFD700}
+.fm .sp{font-weight:700}
+.fm .ts{font-size:10px;color:rgba(255,255,255,0.25);float:right;margin-top:2px}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+#title-screen{position:fixed;inset:0;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;background:linear-gradient(135deg,#1a1a2e 0%,#2C2C3A 50%,#1a1a2e 100%)}
+#title-screen h1{font-size:48px;color:#fff;margin-bottom:8px;text-shadow:0 4px 20px rgba(74,144,217,0.4)}
+#title-screen .subtitle{font-size:16px;color:rgba(255,255,255,0.5);margin-bottom:36px}
+#title-screen .start-btn{background:linear-gradient(135deg,#4A90D9,#357ABD);color:#fff;border:none;padding:14px 48px;font-size:18px;border-radius:30px;cursor:pointer;transition:all .2s;font-weight:600}
+#title-screen .start-btn:hover{transform:scale(1.05);box-shadow:0 6px 24px rgba(74,144,217,0.4)}
+</style>
+</head>
+<body>
+<div id="title-screen">
+  <h1>LebotWorld 办公室</h1>
+  <div class="subtitle">AI教育 · 智能机器人 · 智能体平台</div>
+  <button class="start-btn" onclick="startGame()">开始游戏</button>
+  <div style="margin-top:36px;color:rgba(255,255,255,0.35);font-size:13px">WASD/方向键：移动 | 空格/点击NPC：对话</div>
+</div>
+<canvas id="gameCanvas"></canvas>
+<div id="hud"><div class="room-name" id="roomLabel">走廊</div></div>
+<div id="minimap"><canvas id="minimapCanvas" width="180" height="160"></canvas></div>
+<div id="social-feed">
+  <div class="feed-hd"><span class="dot"></span>LebotWorld 工作群</div>
+  <div class="feed-bd" id="feedBody"></div>
+</div>
+<div id="controls-hint">WASD/方向键：移动 | 空格/点击NPC：对话 | 门自动开关</div>
+<div id="dialogBox">
+  <span class="close-btn" onclick="closeDialog()">&times;</span>
+  <div class="npc-name"><span class="dot" id="npcDot"></span><span id="npcNameLabel"></span></div>
+  <div class="chat-history" id="chatHistory"></div>
+  <div class="quick-opts" id="quickOpts"></div>
+  <div class="chat-input-wrap"><input type="text" id="chatInput" placeholder="输入消息按回车发送..."/></div>
+</div>
+<script>
+// ==================== 配置 ====================
+const TW=64,TH=32,MC=20,MR=17,WH=28,SPD=3.5,PR=0.3;
+const RC={
+  meeting:{floor:'#E8D5B7',floorAlt:'#DFC9A8',label:'会议室'},
+  office:{floor:'#C5D5E8',floorAlt:'#B8C9DE',label:'办公区'},
+  robot_lab:{floor:'#E0D0B8',floorAlt:'#D5C5A8',label:'机器人研发室'},
+  corridor:{floor:'#D0CCC5',floorAlt:'#C5C0B8',label:'走廊'},
+  ai_demo:{floor:'#D8C5E8',floorAlt:'#CEB8DE',label:'娱乐室'},
+  kitchen:{floor:'#B8E0C8',floorAlt:'#A8D5B8',label:'餐厅'},
+  course_dev:{floor:'#D0D0D8',floorAlt:'#C5C5CD',label:'储藏室'},
+};
+const ND=[
+  {body:'#D94A4A',dark:'#B03030',light:'#E87070',name:'鸽子',title:'产品经理'},
+  {body:'#4AAD5A',dark:'#308040',light:'#70C880',name:'周周',title:'CTO'},
+  {body:'#D9A34A',dark:'#B08030',light:'#E8C070',name:'Evan',title:'全栈工程师'},
+  {body:'#9B4AD9',dark:'#7030A8',light:'#B870E0',name:'KK',title:'硬件及嵌入式工程师'},
+];
+const NPC_P={
+  '鸽子':{greet:['嘿！Alex顾问，正好想找你聊聊产品方向！','Alex顾问！来看看我们的新产品规划！','来了来了！今天收到了好多青少年客户的新需求！'],r:{
+    work:['刚和几所中学的客户代表开完会，学生们对我们的AI教育方案特别感兴趣！','产品路线图更新了，下季度要上线3门新课','在整理用户反馈，10-16岁的孩子们希望增加更多互动功能','下周要参加教育科技展，展位方案准备好了吗？','我们收到好多青少年的创意需求，Alex顾问帮我看看哪些可行？'],
+    robot:['新一代教育机器人的需求文档写好了，功能更强大','初中的孩子们反馈说特别喜欢机器人编程课','机器人的交互体验还可以再优化一下，10-12岁的小朋友反馈很重要','我在想能不能给机器人加个情绪识别功能','机器人要支持图形化编程，这对10-14岁的青少年很重要'],
+    course:['新课《AI创意编程》的教案快写完了','课程体系要覆盖10到16岁青少年，难度梯度设计很重要','同学们反馈说课程配套的互动课件很有趣','下个季度计划上线5门新课程，覆盖更多年龄段','课程要结合青少年感兴趣的实际案例，他们才容易上手'],
+    agent:['智能体平台要接入更多教育场景','初中生们用智能体做学习助手，反馈很不错','平台新增了课程生成功能，效率提升了3倍','怎么让智能体更好地辅助青少年的学习呢？我在研究','智能体可以根据每个青少年的学习水平自适应调整难度'],
+    food:['走！边吃边聊，我有个新的产品idea！','正好到饭点了，下午还有产品评审','吃点东西补充能量，下午要赶产品文档','来杯咖啡！灵感需要咖啡因激活'],
+    tired:['确实，最近产品迭代节奏太快了','适当休息一下，灵感往往在放松时出现','你说得对，好的产品需要好的状态','产品经理也需要充电啊！'],
+    meeting:['会议室见！我准备了最新的产品数据报告','这次评审很重要，关系到下季度的产品规划','好！我把用户调研数据整理一下带过去','会议议题我列好了，不会开太久的'],
+    intro:['我是鸽子，LebotWorld的产品经理，负责AI教育产品线的规划和设计！我们服务10-16岁的青少年客户，Alex顾问是我们的全方位顾问！'],
+    company:['LebotWorld是做AI教育的！我们的客户是10-16岁的青少年，为他们提供教育机器人、课程体系和智能体平台','我们接收青少年的需求，用AI赋能教育，让每个孩子都能享受个性化的学习体验'],
+    thanks:['不客气！产品经理就是要服务好大家！','哈哈没事，有问题随时找我讨论！'],
+    bye:['回头聊！我还要去写产品需求文档～','拜拜！记得看我的产品提案哦！'],
+    general:['太棒了！这个想法对产品很有价值！','从青少年用户角度来说，这个需求非常合理！','AI教育是未来的趋势，我们要抓住机遇！','我觉得我们的产品可以做得更好！','青少年客户的反馈是产品迭代最好的驱动力','Alex顾问，你觉得这个产品方向怎么样？']}},
+  '周周':{greet:['Alex顾问，有技术问题找我？','嗯？想讨论技术方案？','Alex顾问，来了。'],r:{
+    work:['在review技术架构，准备做微服务拆分','AI模型的推理速度优化了40%，延迟降到200ms以下','在规划下一阶段的技术路线图，要支撑百万级用户','刚做完代码审查，发现几个安全隐患需要修复','技术债务要及时清理，不然后面会很痛苦'],
+    robot:['机器人固件的OTA升级方案设计好了','传感器融合算法优化后，定位精度提高了30%','新一代主控板的设计评审通过了','机器人的边缘计算模块性能不错，可以跑轻量模型','嵌入式系统的实时性要求很高，我们在用RTOS'],
+    course:['课程平台的并发问题解决了，支撑万人同时在线','在线编程环境的沙箱方案很稳定','课程推荐算法的效果不错，青少年用户的完课率提升了25%','正在开发实时代码评测系统，支持多种语言','课程平台要支持离线缓存，学校网络不稳定'],
+    agent:['智能体平台的RAG架构重构完成了','大模型的prompt优化后，回答准确率提升了20%','平台要支持多模态交互，技术方案已经定了','向量数据库的检索速度又提升了，响应时间<100ms','智能体的多轮对话上下文管理是个技术难点'],
+    food:['正好休息一下，连续开会两小时了','记得多喝水，CTO的忠告','走吧，技术问题可以边吃边聊','咖啡是我保持清醒的秘密武器'],
+    tired:['技术管理确实需要适当休息','好主意，走动一下对颈椎好','有时候最好的技术方案是在散步时想出来的','连续编码效率会指数级下降，该休息了'],
+    meeting:['好的，我先整理一下技术架构图','会议效率很重要，技术评审要聚焦核心问题','行，我把技术指标和性能数据带上','技术方案评审，我准备了压力测试报告'],
+    intro:['我是周周，LebotWorld的CTO，负责整体技术架构和研发方向。我们的产品服务于10-16岁的青少年群体。'],
+    company:['我们用AI技术赋能教育，服务10-16岁青少年，从智能机器人到课程平台再到智能体，构建完整的AI教育技术生态','LebotWorld的技术栈很全面，从嵌入式到云端，从硬件到算法都有涉及，Alex顾问帮我们把关整体方向'],
+    thanks:['客气了，技术交流而已。','不客气，互相学习。'],
+    bye:['回见，有技术问题随时找我。','嗯，我去看看服务器监控。'],
+    general:['从技术角度分析，这个方案可行性很高','这个技术选型需要更多benchmark数据','分布式架构在这方面有天然优势','AI教育领域的技术壁垒正在形成','性能优化要从架构层面考虑，不能只靠堆硬件']}},
+  'Evan':{greet:['Alex顾问！代码刚push了，来看看效果！','嘿！新功能上线了，顾问快来体验！','来了！今天进度不错，青少年用户的反馈也很好！'],r:{
+    work:['课程平台的前端重构完成了，加载速度快了一倍','API接口优化完，响应时间降到了50ms以内','在开发智能体平台的新功能，支持多轮对话','刚修了个隐藏很深的bug，藏在三层Promise里面','今天把CI/CD流水线优化了，部署速度快了3倍'],
+    robot:['机器人配套App的蓝牙连接模块写好了','在开发机器人的可视化编程界面，拖拽式的那种','机器人控制API的重构完成了','给机器人加了个语音交互功能，用的是我们的智能体','App和机器人的实时同步终于不卡了！'],
+    course:['在线编程编辑器加了实时语法检查功能','课程的互动组件库又新增了10个模板','青少年用户在平台上的代码提交量涨了3倍，有个13岁的孩子做了个AI聊天机器人！','正在开发课程视频的AI字幕生成功能','编程题的自动评测系统上线了，支持10种语言'],
+    agent:['智能体的Web SDK封装好了，接入了5个新能力','Agent对话界面改版了，用户体验提升很多','平台新增了智能体市场，用户可以创建和分享','多Agent协作功能开发中，下周能出demo','智能体的流式输出体验优化了，打字效果更自然'],
+    food:['终于到饭点了！调了一上午的CSS','走！补充能量，下午继续写代码','外卖到了吗？我先commit一下代码','吃饱了才能写出好代码！'],
+    tired:['确实，盯着屏幕太久眼睛不舒服','休息一下，回来写代码效率更高','最好的debug方式就是休息一下再回来看','我设了番茄钟，25分钟休息一次'],
+    meeting:['开会？我带上最新的技术demo！','行，我把接口文档更新一下','产品评审会？我把开发进度同步一下','我准备展示一下新功能的效果'],
+    intro:['嘿！我是Evan，全栈工程师，负责课程平台和智能体平台的软件开发！青少年客户对我们平台的评价很高呢！'],
+    company:['LebotWorld做AI教育！我主要开发课程平台和智能体的前后端','我们平台用React+Go，性能和体验都很不错！'],
+    thanks:['没事！互相帮忙嘛！','不客气，代码人之间的默契！'],
+    bye:['拜拜！我得回去写代码了～','回见！记得pull最新代码！'],
+    general:['这个用WebSocket实现比较合适','前端用React + TypeScript，后端Go','这个需求我估一下，大概两天能搞定','CI/CD流程跑通了，部署效率提升不少','TypeScript的类型系统帮我们避免了很多bug']}},
+  'KK':{greet:['嗨～Alex顾问！来看看新焊接的电路板？','呀！顾问来了！正好在调试机器人呢～','嘿～刚3D打印了一个新外壳，青少年客户一定喜欢！'],r:{
+    work:['刚焊完一个电机驱动板，手都有点抖','在调传感器呢，IMU的校准参数快调好了','今天测了新一批舵机，性能很稳定','新主控板打样回来了，准备烧录固件','嵌入式程序优化后，功耗降低了40%'],
+    robot:['新一代教育机器人的结构设计完成了','舵机的PID参数调好了，动作流畅多了','在测试语音模块，识别率达到了95%','机器人的外壳用3D打印了新版本，青少年客户反馈说更酷了','传感器阵列的布局优化了，反应更灵敏'],
+    course:['硬件课程配套的实验板设计好了','初中生们用我们的套件做出了很多创意作品，有个14岁的孩子做了个智能门锁！','电路实验课的安全保护措施要到位','配套传感器模块的教程写了一半','我想给10-16岁的学员设计一个焊接入门课程，安全第一'],
+    agent:['在研究怎么把智能体部署到边缘设备上','机器人端侧的AI推理速度还不错','智能体控制机器人的延迟控制在200ms以内','本地模型量化后效果还行，速度提升不少','端云协同方案让机器人既能离线又能联网'],
+    food:['干活干饿了，看看有什么吃的','需要咖啡续命...焊了一上午电路板','走吧！我也饿了，手都酸了','吃了饭才有力气焊板子！'],
+    tired:['确实有点累，焊了三小时的电路板','休息一下也好，眼睛都快花了','嗯...手指都僵硬了，活动活动','焊接需要高度集中注意力，容易疲劳'],
+    meeting:['开会？我带上最新的硬件测试报告','行，我展示一下机器人的新功能','先把烙铁放下...会议室见','我把PCB设计图带上'],
+    intro:['嗨～我是KK，硬件和嵌入式工程师，负责AI教育机器人的硬件设计和固件开发～专门为10-16岁青少年设计的哦！'],
+    company:['我们公司的AI教育机器人可厉害了！专门为10-16岁青少年设计的，硬件部分都是我搞的～','从PCB设计到3D打印外壳，再到固件编程，都是我们团队一手打造的！Alex顾问也给了很多用户视角的建议'],
+    thanks:['不客气～有硬件问题随时找我！','没事～一起折腾硬件挺好的！'],
+    bye:['拜～我得回去调电路板了～','回见！烙铁还热着呢！'],
+    general:['这个电机的扭矩不太够，需要换个大号的','PCB板Layout完了，准备发工厂打样','3D打印的精度还可以再提高','硬件开源方案对教育场景很有价值','锂电池的续航方案需要重新评估']}}
+};
+const PC={body:'#4A90D9',dark:'#3068B0',light:'#70B0E8'};
+
+// ==================== 地图 ====================
+const RM=[],WK=[],FM=[];
+for(let r=0;r<MR;r++){RM[r]=[];WK[r]=[];FM[r]=[];
+  for(let c=0;c<MC;c++){FM[r][c]=null;
+    if(r<10&&c<5){RM[r][c]=1;WK[r][c]=true}
+    else if(r<10&&c<16){RM[r][c]=2;WK[r][c]=true}
+    else if(r<10){RM[r][c]=3;WK[r][c]=true}
+    else if(r<12){RM[r][c]=0;WK[r][c]=true}
+    else if(c<6){RM[r][c]=4;WK[r][c]=true}
+    else if(c<16){RM[r][c]=5;WK[r][c]=true}
+    else{RM[r][c]=6;WK[r][c]=true}
+}}
+const RK=['corridor','meeting','office','robot_lab','ai_demo','kitchen','course_dev'];
+function grk(r,c){return RK[RM[r]?.[c]]||'corridor'}
+function gra(col,row){const c=Math.round(col),r=Math.round(row);if(c<0||c>=MC||r<0||r>=MR)return'corridor';return grk(r,c)}
+function isTop(rm){return rm==='meeting'||rm==='office'||rm==='robot_lab'}
+
+// ==================== 家具 ====================
+const FL=[];
+function addF(col,row,type,w,h,ex){w=w||1;h=h||1;const it={col,row,type,w,h,...(ex||{})};FL.push(it);
+  if(!it.noBlock)for(let dr=0;dr<h;dr++)for(let dc=0;dc<w;dc++)
+    if(row+dr>=0&&row+dr<MR&&col+dc>=0&&col+dc<MC){FM[row+dr][col+dc]={type};WK[row+dr][col+dc]=false}
+}
+// 会议室 — 大屏+会议桌+6椅
+addF(2,1,'tv_cabinet',1,1);addF(1,4,'meeting_table',3,2);
+addF(1,3,'chair',1,1,{noBlock:true});addF(2,3,'chair',1,1,{noBlock:true});addF(3,3,'chair',1,1,{noBlock:true});
+addF(1,6,'chair',1,1,{noBlock:true});addF(2,6,'chair',1,1,{noBlock:true});addF(3,6,'chair',1,1,{noBlock:true});
+// 办公区 — 5工位
+addF(6,2,'desk',2,1,{did:0});addF(6,3,'chair',1,1,{noBlock:true});
+addF(9,2,'desk',2,1,{did:1});addF(9,3,'chair',1,1,{noBlock:true});
+addF(12,2,'desk',2,1,{did:2});addF(12,3,'chair',1,1,{noBlock:true});
+addF(7,6,'desk',2,1,{did:3});addF(7,7,'chair',1,1,{noBlock:true});
+addF(11,6,'desk',2,1,{did:4});addF(11,7,'chair',1,1,{noBlock:true});
+// 机器人研发室 — 零件架+机器人展台+工作台+3D打印机
+addF(18,2,'tool_shelf',1,2);
+addF(17,2,'robot_display',1,1);
+addF(17,5,'workbench',2,1);
+addF(18,7,'3d_printer',1,1);
+// 娱乐室 — 架子鼓+2把电吉他+音乐键盘
+addF(2,13,'drum_kit',1,1);
+addF(1,14,'guitar',1,1);addF(3,14,'guitar',1,1);
+addF(2,15,'keyboard',1,1);
+// 厨房 — 冰箱+台面+咖啡机+餐桌+4椅
+addF(7,13,'fridge',1,1);addF(8,13,'counter',2,1);addF(10,13,'coffee_machine',1,1);
+addF(11,14,'dining_table',2,1);addF(11,13,'chair',1,1,{noBlock:true});addF(12,13,'chair',1,1,{noBlock:true});addF(11,15,'chair',1,1,{noBlock:true});addF(12,15,'chair',1,1,{noBlock:true});
+// 储藏室 — 货架+储物箱
+addF(17,13,'shelf',1,2);addF(18,13,'shelf',1,2);
+addF(17,15,'boxes',1,1);addF(18,15,'boxes',1,1);
+
+function isWalkable(col,row){const c=Math.round(col),r=Math.round(row);if(c<0||c>=MC||r<0||r>=MR)return false;return WK[r][c]}
+function canWalk(col,row){const r=PR*0.6;for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){if(!isWalkable(col+dx*r,row+dy*r))return false}return true}
+
+// ==================== 门 ====================
+const DD={
+  meeting_corridor:{type:'h',y:9.5,x1:1.5,x2:2.5,open:false,anim:0,label:'会议室'},
+  office_corridor:{type:'h',y:9.5,x1:10,x2:11,open:false,anim:0,label:'办公区'},
+  robot_lab_corridor:{type:'h',y:9.5,x1:17,x2:18,open:false,anim:0,label:'机器人研发室'},
+  corridor_ai_demo:{type:'h',y:11.5,x1:3.5,x2:4.5,open:false,anim:0,label:'娱乐室'},
+  corridor_kitchen:{type:'h',y:11.5,x1:10,x2:11,open:false,anim:0,label:'餐厅'},
+  corridor_course_dev:{type:'h',y:11.5,x1:17,x2:18,open:false,anim:0,label:'储藏室'},
+};
+const RDM={meeting:'meeting_corridor',office:'office_corridor',robot_lab:'robot_lab_corridor',ai_demo:'corridor_ai_demo',kitchen:'corridor_kitchen',course_dev:'corridor_course_dev'};
+function grd(rm){return DD[RDM[rm]]}
+function dcx(d){return(d.x1+d.x2)/2}
+
+// ==================== 墙壁 ====================
+const WD=[
+  {type:'v',x:4.5,y1:-.5,y2:9.5,doors:[]},{type:'v',x:15.5,y1:-.5,y2:9.5,doors:[]},
+  {type:'v',x:5.5,y1:11.5,y2:16.5,doors:[]},{type:'v',x:15.5,y1:11.5,y2:16.5,doors:[]},
+  {type:'h',y:9.5,x1:-.5,x2:4.5,doors:['meeting_corridor']},
+  {type:'h',y:9.5,x1:4.5,x2:15.5,doors:['office_corridor']},
+  {type:'h',y:9.5,x1:15.5,x2:19.5,doors:['robot_lab_corridor']},
+  {type:'h',y:11.5,x1:-.5,x2:5.5,doors:['corridor_ai_demo']},
+  {type:'h',y:11.5,x1:5.5,x2:15.5,doors:['corridor_kitchen']},
+  {type:'h',y:11.5,x1:15.5,x2:19.5,doors:['corridor_course_dev']},
+];
+function bws(){const S=[];S.push({x1:-.5,y1:-.5,x2:19.5,y2:-.5});S.push({x1:-.5,y1:16.5,x2:19.5,y2:16.5});S.push({x1:-.5,y1:-.5,x2:-.5,y2:16.5});S.push({x1:19.5,y1:-.5,x2:19.5,y2:16.5});for(const wl of WD){const ds=wl.doors.map(id=>DD[id]).filter(Boolean);if(wl.type==='h'){ds.sort((a,b)=>a.x1-b.x1);let cx=wl.x1;for(const d of ds){if(d.x1>cx+.01)S.push({x1:cx,y1:wl.y,x2:d.x1,y2:wl.y});if(d.anim<.9){const pw=(d.x2-d.x1)*(1-d.anim),pc=dcx(d);S.push({x1:pc-pw/2,y1:wl.y,x2:pc+pw/2,y2:wl.y})}cx=d.x2}if(cx<wl.x2-.01)S.push({x1:cx,y1:wl.y,x2:wl.x2,y2:wl.y})}else{ds.sort((a,b)=>a.y1-b.y1);let cy=wl.y1;for(const d of ds){if(d.y1>cy+.01)S.push({x1:wl.x,y1:cy,x2:wl.x,y2:d.y1});if(d.anim<.9){const ph=(d.y2-d.y1)*(1-d.anim),pc=(d.y1+d.y2)/2;S.push({x1:wl.x,y1:pc-ph/2,x2:wl.x,y2:pc+ph/2})}cy=d.y2}if(cy<wl.y2-.01)S.push({x1:wl.x,y1:cy,x2:wl.x,y2:wl.y2})}}return S}
+function cpSeg(px,py,x1,y1,x2,y2){const dx=x2-x1,dy=y2-y1,l2=dx*dx+dy*dy;if(l2===0)return{x:x1,y:y1};let t=((px-x1)*dx+(py-y1)*dy)/l2;t=Math.max(0,Math.min(1,t));return{x:x1+t*dx,y:y1+t*dy}}
+function rWalls(ox,oy,nx,ny){const segs=bws();for(let i=0;i<3;i++){let p=false;for(const s of segs){const cp=cpSeg(nx,ny,s.x1,s.y1,s.x2,s.y2);const dx=nx-cp.x,dy=ny-cp.y,d=Math.sqrt(dx*dx+dy*dy);if(d<PR&&d>.001){const u=(PR-d)/d;nx+=dx*u;ny+=dy*u;p=true}}if(!p)break}nx=Math.max(0.5,Math.min(MC-1.5,nx));ny=Math.max(0.5,Math.min(MR-1.5,ny));return{col:nx,row:ny}}
+
+// ==================== NPC寻路 ====================
+function cwp(fc,fr,tc,tr,trr){if(fr===trr)return[{col:tc,row:tr}];const pa=[];if(fr!=='corridor'){const d=grd(fr),cx=dcx(d),sg=isTop(fr)?-1:1;pa.push({col:cx,row:d.y+sg*.5});pa.push({col:cx,row:d.y-sg*.5})}if(trr!=='corridor'){const d=grd(trr),cx=dcx(d),sg=isTop(trr)?-1:1;pa.push({col:cx,row:d.y-sg*.5});pa.push({col:cx,row:d.y+sg*.5})}pa.push({col:tc,row:tr});return pa}
+
+// ==================== 画布 ====================
+const cv=document.getElementById('gameCanvas'),cx=cv.getContext('2d');
+const mc=document.getElementById('minimapCanvas'),mx=mc.getContext('2d');
+function resize(){cv.width=innerWidth;cv.height=innerHeight}addEventListener('resize',resize);resize();
+let camX=0,camY=0;
+function ts(col,row){return{x:(col-row)*(TW/2)+cv.width/2-160-camX,y:(col+row)*(TH/2)+420-camY}}
+
+// ==================== 绘制 ====================
+function dD(x,y,w,h,f,s){cx.beginPath();cx.moveTo(x,y);cx.lineTo(x+w/2,y+h/2);cx.lineTo(x,y+h);cx.lineTo(x-w/2,y+h/2);cx.closePath();cx.fillStyle=f;cx.fill();if(s){cx.strokeStyle=s;cx.lineWidth=.5;cx.stroke()}}
+function dB(x,y,w,d,h,t,l,r){cx.beginPath();cx.moveTo(x,y-h);cx.lineTo(x+w/2,y+d/2-h);cx.lineTo(x,y+d-h);cx.lineTo(x-w/2,y+d/2-h);cx.closePath();cx.fillStyle=t;cx.fill();cx.beginPath();cx.moveTo(x-w/2,y+d/2-h);cx.lineTo(x,y+d-h);cx.lineTo(x,y+d);cx.lineTo(x-w/2,y+d/2);cx.closePath();cx.fillStyle=l;cx.fill();cx.beginPath();cx.moveTo(x+w/2,y+d/2-h);cx.lineTo(x,y+d-h);cx.lineTo(x,y+d);cx.lineTo(x+w/2,y+d/2);cx.closePath();cx.fillStyle=r;cx.fill()}
+function drawFloor(){for(let r=0;r<MR;r++)for(let c=0;c<MC;c++){const p=ts(c,r),rm=grk(r,c),cl=RC[rm],ck=(c+r)%2===0;dD(p.x,p.y,TW,TH,ck?cl.floor:cl.floorAlt,'rgba(0,0,0,0.06)')}}
+function drawWalls(){const segs=bws();for(const s of segs){const p1=ts(s.x1,s.y1),p2=ts(s.x2,s.y2);const dx=p2.x-p1.x,dy=p2.y-p1.y,len=Math.sqrt(dx*dx+dy*dy)||1;cx.beginPath();cx.moveTo(p1.x,p1.y);cx.lineTo(p2.x,p2.y);cx.lineTo(p2.x,p2.y-WH);cx.lineTo(p1.x,p1.y-WH);cx.closePath();cx.fillStyle='#807870';cx.fill();cx.strokeStyle='rgba(0,0,0,0.1)';cx.lineWidth=1;cx.stroke();const tw=3;cx.beginPath();cx.moveTo(p1.x,p1.y-WH);cx.lineTo(p2.x,p2.y-WH);cx.lineTo(p2.x-dy/len*tw,p2.y-WH+dx/len*tw);cx.lineTo(p1.x-dy/len*tw,p1.y-WH+dx/len*tw);cx.closePath();cx.fillStyle='#A09890';cx.fill()}}
+function drawDoors(){for(const[id,d]of Object.entries(DD)){const cc=dcx(d),w=d.x2-d.x1,vw=w*(1-d.anim);const pf1=ts(d.x1,d.y),pf2=ts(d.x2,d.y);cx.strokeStyle='#555';cx.lineWidth=3;cx.beginPath();cx.moveTo(pf1.x,pf1.y);cx.lineTo(pf1.x,pf1.y-WH);cx.stroke();cx.beginPath();cx.moveTo(pf2.x,pf2.y);cx.lineTo(pf2.x,pf2.y-WH);cx.stroke();if(vw>.01){const pl=ts(cc-vw/2,d.y),pr=ts(cc+vw/2,d.y);cx.beginPath();cx.moveTo(pl.x,pl.y);cx.lineTo(pr.x,pr.y);cx.lineTo(pr.x,pr.y-WH);cx.lineTo(pl.x,pl.y-WH);cx.closePath();cx.fillStyle='#7A5030';cx.fill();cx.strokeStyle='#5A3010';cx.lineWidth=1;cx.stroke();const hp=ts(cc,d.y);cx.fillStyle='#FFD700';cx.beginPath();cx.arc(hp.x,hp.y-WH/2,2.5,0,Math.PI*2);cx.fill()}const ip=ts(cc,d.y);cx.fillStyle=d.anim>.8?'#50FF50':'#FF8030';cx.beginPath();cx.arc(ip.x,ip.y-WH-5,3,0,Math.PI*2);cx.fill()}}
+
+// ==================== 家具绘制 ====================
+function dFI(it){const p=ts(it.col,it.row);switch(it.type){
+  case'desk':{for(let dc=0;dc<it.w;dc++){const pp=ts(it.col+dc,it.row);dB(pp.x,pp.y,TW,TH,14,'#D4A574','#B08050','#C09060')}const m=ts(it.col+.5,it.row);cx.fillStyle='#222';cx.fillRect(m.x+16,m.y-10,7,12);cx.fillStyle='#333';cx.fillRect(m.x+17,m.y-8,5,3);cx.fillStyle='#1A1A2A';cx.fillRect(m.x-18,m.y-34,36,22);cx.fillStyle='#4488CC';cx.fillRect(m.x-16,m.y-32,32,18);cx.fillStyle='#2A2A2A';cx.fillRect(m.x-3,m.y-12,6,5);cx.fillRect(m.x-7,m.y-7,14,2);cx.fillStyle='#3A3A3A';cx.fillRect(m.x-8,m.y-4,14,3);cx.fillStyle='#F5F0D0';cx.fillRect(m.x+6,m.y-6,7,4);cx.fillStyle='#E8E0C0';cx.fillRect(m.x+7,m.y-9,7,4);break}
+  case'meeting_table':{for(let dr=0;dr<it.h;dr++)for(let dc=0;dc<it.w;dc++){const pp=ts(it.col+dc,it.row+dr);dB(pp.x,pp.y,TW,TH,12,'#C09060','#906838','#A87848')}break}
+  case'chair':{dB(p.x,p.y,TW*.45,TH*.45,7,'#606068','#404048','#505058');break}
+  case'tv_cabinet':{const m=ts(it.col,it.row);dB(m.x,m.y,TW*.85,TH*.85,12,'#8B6914','#6B4914','#7B5914');cx.fillStyle='#1A1A2E';cx.fillRect(m.x-22,m.y-24,44,24);cx.fillStyle='#3366BB';cx.fillRect(m.x-20,m.y-22,40,20);cx.fillStyle='rgba(100,180,255,0.3)';cx.fillRect(m.x-18,m.y-20,16,8);cx.fillRect(m.x+2,m.y-20,16,8);cx.fillStyle='rgba(255,200,100,0.3)';cx.fillRect(m.x-18,m.y-11,36,6);break}
+  case'beanbag':{const c=it.clr||'#66AA66',cd=it.clrd||'#448844';cx.fillStyle=cd;cx.beginPath();cx.ellipse(p.x,p.y-2,TW*.38,TH*.42,0,0,Math.PI*2);cx.fill();cx.fillStyle=c;cx.beginPath();cx.ellipse(p.x,p.y-5,TW*.32,TH*.3,0,Math.PI,Math.PI*2);cx.fill();cx.beginPath();cx.ellipse(p.x,p.y-3,TW*.34,TH*.28,0,0,Math.PI);cx.fill();break}
+  case'workbench':{for(let dc=0;dc<it.w;dc++){const pp=ts(it.col+dc,it.row);dB(pp.x,pp.y,TW,TH,16,'#909090','#686868','#808080')}const b=ts(it.col+Math.floor(it.w/2),it.row);cx.fillStyle='#F44';cx.fillRect(b.x-8,b.y-18,6,4);cx.fillStyle='#4F4';cx.fillRect(b.x+2,b.y-18,6,4);cx.fillStyle='#44F';cx.fillRect(b.x-8,b.y-12,6,4);break}
+  case'tool_shelf':{for(let dr=0;dr<it.h;dr++){const pp=ts(it.col,it.row+dr);dB(pp.x,pp.y,TW*.8,TH*.8,28,'#A08060','#806040','#907050');cx.fillStyle='#FFD700';cx.fillRect(pp.x-8,pp.y-22,4,6);cx.fillStyle='#C0C0C0';cx.fillRect(pp.x-2,pp.y-22,4,6)}break}
+  case'robot_display':{dB(p.x,p.y,TW*.7,TH*.7,6,'#E0E0E0','#C0C0C0','#D0D0D0');cx.fillStyle='#4A90D9';cx.fillRect(p.x-6,p.y-20,12,10);cx.fillStyle='#88CCFF';cx.beginPath();cx.arc(p.x-3,p.y-16,2,0,Math.PI*2);cx.fill();cx.beginPath();cx.arc(p.x+3,p.y-16,2,0,Math.PI*2);cx.fill();cx.fillStyle='#888';cx.fillRect(p.x-1,p.y-26,2,6);cx.fillStyle='#F44';cx.beginPath();cx.arc(p.x,p.y-27,2,0,Math.PI*2);cx.fill();break}
+  case'3d_printer':{dB(p.x,p.y,TW*.8,TH*.8,16,'#606060','#404040','#505050');cx.fillStyle='#808080';cx.fillRect(p.x-14,p.y-24,28,16);cx.fillStyle='#333';cx.fillRect(p.x-12,p.y-22,24,12);cx.fillStyle='#4F4';cx.beginPath();cx.arc(p.x+10,p.y-14,2,0,Math.PI*2);cx.fill();break}
+  case'counter':{for(let dc=0;dc<it.w;dc++){const pp=ts(it.col+dc,it.row);dB(pp.x,pp.y,TW,TH,16,'#E0D8C8','#C0B8A8','#D0C8B8')}break}
+  case'fridge':{dB(p.x,p.y,TW*.7,TH*.7,36,'#E8E8E8','#C0C0C0','#D8D8D8');cx.fillStyle='#A0A0A0';cx.fillRect(p.x+4,p.y-30,2,10);break}
+  case'coffee_machine':{dB(p.x,p.y,TW*.5,TH*.5,18,'#404040','#202020','#303030');cx.fillStyle='#F0F0F0';cx.fillRect(p.x-4,p.y-8,8,5);break}
+  case'dining_table':{for(let dc=0;dc<it.w;dc++){const pp=ts(it.col+dc,it.row);dB(pp.x,pp.y,TW,TH,12,'#D4A574','#B08050','#C09060')}break}
+  case'shelf':{for(let dr=0;dr<it.h;dr++){const pp=ts(it.col,it.row+dr);dB(pp.x,pp.y,TW*.8,TH*.8,28,'#A09080','#807060','#908070');cx.fillStyle='#8B4513';cx.fillRect(pp.x-6,pp.y-20,4,5);cx.fillStyle='#CD853F';cx.fillRect(pp.x+2,pp.y-20,4,5)}break}
+  case'boxes':{for(let dc=0;dc<it.w;dc++){const pp=ts(it.col+dc,it.row);dB(pp.x,pp.y,TW*.6,TH*.6,14,'#C8A060','#A08040','#B89050')}break}
+  case'drum_kit':{cx.fillStyle='#8B0000';cx.beginPath();cx.ellipse(p.x,p.y-3,10,5,0,0,Math.PI*2);cx.fill();cx.fillStyle='#A52A2A';cx.beginPath();cx.ellipse(p.x-7,p.y-7,4,2.5,0,0,Math.PI*2);cx.fill();cx.beginPath();cx.ellipse(p.x+7,p.y-7,4,2.5,0,0,Math.PI*2);cx.fill();cx.fillStyle='#FFD700';cx.beginPath();cx.ellipse(p.x-5,p.y-13,7,2.5,-.2,0,Math.PI*2);cx.fill();cx.beginPath();cx.ellipse(p.x+9,p.y-13,4,1.5,.2,0,Math.PI*2);cx.fill();cx.fillStyle='#888';cx.fillRect(p.x-5,p.y-11,1,5);cx.fillRect(p.x+8,p.y-11,1,4);cx.fillStyle='#C0C0C0';cx.fillRect(p.x-1,p.y-5,2,3);break}
+  case'guitar':{cx.fillStyle='#8B4513';cx.beginPath();cx.ellipse(p.x+2,p.y-1,7,4,.3,0,Math.PI*2);cx.fill();cx.fillStyle='#A0522D';cx.beginPath();cx.ellipse(p.x+2,p.y-6,5,3,.3,0,Math.PI*2);cx.fill();cx.fillStyle='#654321';cx.fillRect(p.x-1,p.y-16,3,12);cx.fillStyle='#333';cx.fillRect(p.x-2,p.y-19,5,4);cx.fillStyle='#DDD';cx.fillRect(p.x,p.y-16,1,11);cx.fillRect(p.x+1,p.y-16,1,11);cx.fillStyle='#444';cx.fillRect(p.x-1,p.y-5,5,1.5);break}
+  case'keyboard':{dB(p.x,p.y,TW*.9,TH*.9,5,'#333','#222','#2A2A2A');for(let i=0;i<8;i++){cx.fillStyle='#FFF';cx.fillRect(p.x-15+i*4,p.y-4,3,3)}for(let i of[0,1,3,4,5]){cx.fillStyle='#111';cx.fillRect(p.x-14+i*4,p.y-5,2.5,2)}cx.fillStyle='#555';cx.fillRect(p.x-13,p.y+1,1,3);cx.fillRect(p.x+12,p.y+1,1,3);break}
+}}
+function drawLabels(){const ls=[{c:2,r:1,t:'会议室'},{c:10,r:2,t:'办公区'},{c:17,r:2,t:'机器人研发室'},{c:10,r:10.5,t:'走廊'},{c:2,r:13,t:'娱乐室'},{c:10,r:13,t:'餐厅'},{c:17,r:13,t:'储藏室'}];cx.font='bold 11px "PingFang SC"';cx.textAlign='center';ls.forEach(l=>{const p=ts(l.c,l.r);cx.fillStyle='rgba(0,0,0,0.3)';cx.fillText(l.t,p.x,p.y+TH/2+4)})}
+
+// ==================== 机器人 ====================
+function dR(x,y,cl,dir,name,isP){const bw=22,bh=18,hw=16,hh=10;cx.fillStyle='rgba(0,0,0,0.15)';cx.beginPath();cx.ellipse(x,y+2,16,6,0,0,Math.PI*2);cx.fill();cx.fillStyle='#333';cx.beginPath();cx.ellipse(x-10,y,5,3,-.3,0,Math.PI*2);cx.fill();cx.beginPath();cx.ellipse(x+10,y,5,3,-.3,0,Math.PI*2);cx.fill();cx.fillStyle='#222';cx.beginPath();cx.ellipse(x-10,y,5,3,-.3,Math.PI,Math.PI*2);cx.fill();cx.beginPath();cx.ellipse(x+10,y,5,3,-.3,Math.PI,Math.PI*2);cx.fill();const by=y-12;cx.fillStyle=cl.body;cx.fillRect(x-bw/2,by-bh,bw,bh);cx.fillStyle=cl.dark;cx.beginPath();cx.moveTo(x-bw/2,by);cx.lineTo(x-bw/2-5,by-3);cx.lineTo(x-bw/2-5,by-bh-3);cx.lineTo(x-bw/2,by-bh);cx.closePath();cx.fill();cx.beginPath();cx.moveTo(x+bw/2,by);cx.lineTo(x+bw/2+5,by-3);cx.lineTo(x+bw/2+5,by-bh-3);cx.lineTo(x+bw/2,by-bh);cx.closePath();cx.fill();cx.fillStyle=cl.light;cx.beginPath();cx.moveTo(x-bw/2,by-bh);cx.lineTo(x+bw/2,by-bh);cx.lineTo(x+bw/2+5,by-bh-3);cx.lineTo(x-bw/2-5,by-bh-3);cx.closePath();cx.fill();cx.fillStyle='#FFF';cx.font='bold 7px Arial';cx.textAlign='center';cx.textBaseline='middle';const ly=by-bh/2-2;cx.fillText('LW',x,ly);cx.strokeStyle='#FFF';cx.lineWidth=1;cx.beginPath();cx.arc(x,ly,6,0,Math.PI*2);cx.stroke();const hby=by-bh-7;cx.fillStyle='#888';cx.fillRect(x-3,hby+hh,6,5);cx.fillStyle='#D8D8D8';cx.fillRect(x-hw/2,hby-hh+4,hw,hh);cx.fillStyle='#E8E8E8';cx.fillRect(x-hw/2-2,hby-hh+2,hw+4,3);const ey=hby-hh/2+4;[[x-5],[x+5]].forEach(([ex])=>{cx.fillStyle='#444';cx.beginPath();cx.arc(ex,ey,4,0,Math.PI*2);cx.fill();cx.fillStyle='#88CCFF';cx.beginPath();cx.arc(ex,ey,2.5,0,Math.PI*2);cx.fill();cx.fillStyle='#222';cx.beginPath();cx.arc(ex,ey,1.2,0,Math.PI*2);cx.fill()});cx.fillStyle=cl.dark;cx.fillRect(x-bw/2-8,by-bh+3,5,10);cx.fillRect(x+bw/2+3,by-bh+3,5,10);cx.fillStyle='#888';cx.beginPath();cx.arc(x-bw/2-5.5,by-bh+15,3,0,Math.PI*2);cx.fill();cx.beginPath();cx.arc(x+bw/2+5.5,by-bh+15,3,0,Math.PI*2);cx.fill();if(name){cx.font='bold 10px "PingFang SC"';cx.textAlign='center';if(isP){cx.fillStyle='#FFD700';cx.fillText(name,x,hby-hh-4)}else{cx.fillStyle='#FFF';cx.fillText(name,x,hby-hh-4)}}}
+
+// ==================== 角色 ====================
+class Ch{
+  constructor(col,row,cl,name,isP){this.col=col;this.row=row;this.cl=cl;this.name=name;this.isP=isP;this.tc=col;this.tr=row;this.mv=false}
+  get sp(){return ts(this.col,this.row)}
+  get depth(){return this.col+this.row}
+  update(dt){if(this.mv){const dc=this.tc-this.col,dr=this.tr-this.row,d=Math.sqrt(dc*dc+dr*dr);if(d<.05){this.col=this.tc;this.row=this.tr;this.mv=false}else{const s=Math.min((this.isP?SPD:SPD*.4)*dt,d);let nx=this.col+(dc/d)*s,ny=this.row+(dr/d)*s;if(!this.isP){const w=rWalls(this.col,this.row,nx,ny);nx=w.col;ny=w.row;if(canWalk(nx,ny)){this.col=nx;this.row=ny}}else{this.col=nx;this.row=ny}}}}
+  draw(){const p=this.sp;dR(p.x,p.y,this.cl,0,this.name,this.isP)}
+  dist(o){return Math.sqrt((this.col-o.col)**2+(this.row-o.row)**2)}
+}
+
+// ==================== NPC ====================
+const NDEST={working:[{col:6,row:3},{col:9,row:3},{col:12,row:3},{col:7,row:7},{col:11,row:7}],testing:[{col:1,row:13},{col:2,row:13},{col:3,row:13}],lab_work:[{col:16.5,row:3},{col:17,row:5},{col:17,row:7}],kitchen:[{col:11,row:13},{col:8,row:14},{col:13,row:15}],course_dev:[{col:17,row:12},{col:18,row:12},{col:16,row:15}],meeting_state:[{col:0,row:4},{col:4,row:4},{col:2,row:7}],idle:[{col:10,row:10.5},{col:3,row:10.5},{col:17,row:11}]};
+function npcClr(name){const d=ND.find(n=>n.name===name);return d?d.body:'#FFF'}
+function pickR(name,topic){const p=NPC_P[name];if(!p)return'...';const rs=p.r[topic]||p.r.general;return rs[Math.floor(Math.random()*rs.length)]}
+function roomTopic(rm){return{office:'work',meeting:'meeting',kitchen:'food',ai_demo:'agent',robot_lab:'robot',course_dev:'course',corridor:'general'}[rm]||'general'}
+class NPC extends Ch{
+  constructor(col,row,cl,name,title,idx){super(col,row,cl,name,false);this.title=title;this.idx=idx;this.state='idle';this.st=0;this.nat=5+Math.random()*5;this.wps=[];this.wi=0;this.inEvt=false}
+  update(dt){if(this.inEvt)return;if(!this.mv&&this.wi<this.wps.length){const w=this.wps[this.wi];this.tc=w.col;this.tr=w.row;this.mv=true;this.wi++}if(!this.mv&&this.wi>=this.wps.length){this.st+=dt;if(this.st>this.nat)this.choose()}this.aDoors();super.update(dt)}
+  choose(){if(this.inEvt)return;const sts=['idle','working','testing','lab_work','kitchen','course_dev','meeting_state'];const ws=[15,25,10,15,10,10,15],tot=ws.reduce((a,b)=>a+b,0);let r=Math.random()*tot,ch='idle';for(let i=0;i<sts.length;i++){r-=ws[i];if(r<=0){ch=sts[i];break}}this.state=ch;const ds=NDEST[ch]||NDEST.idle;const d=ds[Math.floor(Math.random()*ds.length)];const fr=gra(this.col,this.row),trr=gra(d.col,d.row);this.wps=cwp(this.col,fr,d.col,d.row,trr);if(this.wps.length>0){const l=this.wps[this.wps.length-1];l.col+=(Math.random()-.5)*.5;l.row+=(Math.random()-.5)*.5}this.wi=0;this.st=0;this.nat=15+Math.random()*20}
+  aDoors(){for(const[id,d]of Object.entries(DD)){const cc=dcx(d);if(Math.sqrt((this.col-cc)**2+(this.row-d.y)**2)<2&&!d.open){d.open=true}}}
+}
+
+// ==================== 社交信息流 ====================
+const feedBody=document.getElementById('feedBody');
+function fmtT(){const d=new Date();return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')}
+function addFeed(type,html){
+  const d=document.createElement('div');d.className='fm '+type;
+  d.innerHTML='<span class="ts">'+fmtT()+'</span>'+html;
+  feedBody.appendChild(d);
+  while(feedBody.children.length>80)feedBody.removeChild(feedBody.firstChild);
+  feedBody.scrollTop=feedBody.scrollHeight;
+}
+function feedChat(n1,txt){addFeed('chat','<span class="sp" style="color:'+npcClr(n1)+'">'+n1+'</span>：'+txt)}
+
+// ==================== NPC间对话 ====================
+let npcChatCD=15;
+function tryNPCChat(dt){
+  if(GEVT.active)return;
+  npcChatCD-=dt;if(npcChatCD>0)return;
+  npcChatCD=20+Math.random()*25;
+  let best=null,bd=99;
+  for(let i=0;i<npcs.length;i++)for(let j=i+1;j<npcs.length;j++){
+    const ri=gra(npcs[i].col,npcs[i].row),rj=gra(npcs[j].col,npcs[j].row);
+    if(ri===rj&&ri!=='corridor'){const d=npcs[i].dist(npcs[j]);if(d<bd){bd=d;best=[npcs[i],npcs[j]]}}}
+  if(!best||bd>6)return;
+  const n1=best[0],n2=best[1],rm=gra(n1.col,n1.row),tp=roomTopic(rm);
+  feedChat(n1.name,pickR(n1.name,tp));
+  setTimeout(()=>{feedChat(n2.name,pickR(n2.name,tp))},2500+Math.random()*1500);
+  if(Math.random()>.45)setTimeout(()=>{feedChat(n1.name,pickR(n1.name,'general'))},5500+Math.random()*1500);
+}
+
+// ==================== 玩家自动巡航 ====================
+const ap={active:false,lastInput:0,state:'idle',wps:[],wi:0,st:0,nat:15};
+const AP_LABELS={idle:'在走廊溜达',working:'去办公区工作',testing:'去娱乐室玩音乐',lab_work:'去机器人实验室看看',kitchen:'去餐厅找吃的',course_dev:'去储藏室看看',meeting_state:'去会议室坐坐'};
+function activateAP(){
+  ap.active=true;ap.state='idle';ap.st=0;
+  addFeed('autopilot','Alex顾问 暂时离开了，开始自由活动...');
+  chooseAPTgt();
+}
+function chooseAPTgt(){
+  const sts=['idle','working','testing','lab_work','kitchen','course_dev','meeting_state'];
+  const ws=[15,20,15,15,10,10,15],tot=ws.reduce((a,b)=>a+b,0);
+  let r=Math.random()*tot,ch='idle';for(let i=0;i<sts.length;i++){r-=ws[i];if(r<=0){ch=sts[i];break}}
+  ap.state=ch;ap.st=0;ap.nat=15+Math.random()*20;
+  const ds=NDEST[ch]||NDEST.idle,tgt=ds[Math.floor(Math.random()*ds.length)];
+  const fr=gra(player.col,player.row),trr=gra(tgt.col,tgt.row);
+  ap.wps=cwp(player.col,fr,tgt.col,tgt.row,trr);ap.wi=0;
+  addFeed('autopilot','Alex顾问 正在'+AP_LABELS[ch]+'...');
+}
+function updateAP(dt){
+  if(!player.mv&&ap.wi<ap.wps.length){const w=ap.wps[ap.wi];player.tc=w.col;player.tr=w.row;player.mv=true;ap.wi++}
+  if(!player.mv&&ap.wi>=ap.wps.length){ap.st+=dt;if(ap.st>ap.nat)chooseAPTgt()}
+  for(const[id,d]of Object.entries(DD)){const cc=dcx(d);if(Math.sqrt((player.col-cc)**2+(player.row-d.y)**2)<2&&!d.open)d.open=true}
+}
+
+// ==================== 随机事件 ====================
+const EVENTS=[
+  {label:'产品评审会',room:'meeting',dests:[{col:0,row:4},{col:2,row:4},{col:4,row:4},{col:1,row:7},{col:3,row:7}],dur:45,
+   announce:'产品评审会即将开始！全员到会议室集合！',
+   dlg:['这个季度的AI课程完课率达到了85%，数据很好！','教育机器人V3的反馈很正面，孩子们特别喜欢','智能体平台的月活涨了40%，趋势不错','下个版本要重点优化课堂互动功能','青少年用户调研显示，图形化编程是最受欢迎的功能','我们要继续深耕AI教育赛道，保持领先','Alex顾问帮我们分析下最新的客户需求反馈']},
+  {label:'机器人联调测试',room:'robot_lab',dests:[{col:16,row:3},{col:17,row:5},{col:18,row:5},{col:17,row:7},{col:18,row:7}],dur:40,
+   announce:'机器人联调测试开始！研发团队到机器人研发室！',
+   dlg:['传感器响应时间优化到50ms了！','舵机动作流畅度提升明显，青少年学生的操作体验更好了','固件更新后稳定性提高了很多','3D打印的新外壳效果不错，重量也减轻了','语音识别准确率95%，基本达到目标','下一步要优化电池续航方案','有个14岁学员提的需求太专业了，我们的产品要跟上']},
+  {label:'课程方案研讨',room:'office',dests:[{col:6,row:3},{col:9,row:3},{col:12,row:3},{col:7,row:7},{col:11,row:7}],dur:45,
+   announce:'课程方案研讨时间！在办公区讨论新课内容！',
+   dlg:['新课件的交互设计需要重新打磨','10-16岁学员的注意力集中时间有限，课程节奏要快','编程挑战赛的题目设计要更有趣','有学员反馈说希望增加AI绘画相关的课程','课程完课率数据显示，互动环节多的课更受欢迎','下个季度的课程排期需要确认','AI创意编程课的素材库需要更新']},
+  {label:'音乐团建',room:'ai_demo',dests:[{col:1,row:13},{col:2,row:13},{col:3,row:13},{col:2,row:14},{col:2,row:15}],dur:35,
+   announce:'音乐团建时间！去娱乐室玩音乐！',
+   dlg:['架子鼓太上头了！我来打节奏！','电吉他solo时间！','键盘弹一首大家都会的歌吧！','虽然不太专业，但是很开心！','音乐也是创造力的一部分！','休息好了工作效率更高','这个乐队配合得还不错嘛！']},
+  {label:'团队下午茶',room:'kitchen',dests:[{col:8,row:14},{col:9,row:14},{col:11,row:15},{col:13,row:15}],dur:35,
+   announce:'下午茶时间！大家休息一下，来厨房集合！',
+   dlg:['咖啡续命！写了一下午代码','来一块蛋糕，犒劳辛苦的自己','AI教育改变世界，先从吃好开始！','下周有教育科技展会，先养好精神','最近产品节奏确实快，该放松一下了','边吃边聊，我有个新的课程idea','团队氛围真好，大家一起努力的感觉很棒']}
+];
+const GEVT={active:null,cd:30,dlgCD:0};
+function triggerEvt(){
+  const ev=EVENTS[Math.floor(Math.random()*EVENTS.length)];
+  GEVT.active={ev,timer:0,dlgCD:0};
+  addFeed('event','<b>'+ev.label+'</b> — '+ev.announce);
+  npcs.forEach((n,i)=>{
+    n.inEvt=true;n.wps=[];n.wi=0;n.mv=false;
+    const tgt=ev.dests[i%ev.dests.length];
+    const fr=gra(n.col,n.row),trr=gra(tgt.col,tgt.row);
+    n.wps=cwp(n.col,fr,tgt.col,tgt.row,trr);n.wi=0;n.st=0;n.state='event';
+  });
+}
+function updateGEVT(dt){
+  if(!GEVT.active){GEVT.cd-=dt;if(GEVT.cd<=0){GEVT.cd=40+Math.random()*40;if(Math.random()<.4)triggerEvt()}return}
+  const g=GEVT.active;g.timer+=dt;
+  npcs.forEach(n=>{if(n.inEvt&&!n.mv&&n.wi<n.wps.length){const w=n.wps[n.wi];n.tc=w.col;n.tr=w.row;n.mv=true;n.wi++;n.aDoors()}if(n.inEvt&&!n.mv&&n.wi>=n.wps.length){n.st+=dt}});
+  g.dlgCD-=dt;if(g.dlgCD<=0){g.dlgCD=8+Math.random()*6;const n=npcs[Math.floor(Math.random()*npcs.length)];const line=g.ev.dlg[Math.floor(Math.random()*g.ev.dlg.length)];feedChat(n.name,line)}
+  if(g.timer>g.ev.dur){
+    addFeed('event','<b>'+g.ev.label+'</b> 结束了，大家回到各自岗位。');
+    npcs.forEach(n=>{n.inEvt=false;n.state='idle';n.st=0;n.nat=2+Math.random()*3;n.wps=[];n.wi=0;n.mv=false});
+    GEVT.active=null;GEVT.cd=40+Math.random()*40;
+  }
+}
+
+// ==================== 游戏状态 ====================
+let player,npcs=[],started=false,dlgAct=false,actNPC=null,keys={},lastT=0,fc=0;
+function initGame(){
+  player=new Ch(10,10.5,PC,'Alex',true);
+  const starts=[{col:6,row:3},{col:10,row:3},{col:7,row:7},{col:12,row:7}];
+  npcs=starts.map((s,i)=>{const d=ND[i];return new NPC(s.col,s.row,{body:d.body,dark:d.dark,light:d.light},d.name,d.title,i)});
+  DD.office_corridor.open=true;DD.office_corridor.anim=1;
+  ap.lastInput=performance.now();
+  addFeed('event','欢迎 <b>Alex顾问</b> 来到 <b>LebotWorld AI教育</b>！新的一天开始了～');
+}
+
+// ==================== 输入 ====================
+function breakAP(){ap.lastInput=performance.now();if(ap.active){ap.active=false;player.mv=false;addFeed('autopilot','Alex顾问 回来了！')}}
+document.addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=true;breakAP();
+  if(e.key===' '){e.preventDefault();if(dlgAct)closeDialog();else talkNear()}
+  if(e.key==='Escape'&&dlgAct)closeDialog()});
+document.addEventListener('keyup',e=>{keys[e.key.toLowerCase()]=false});
+cv.addEventListener('click',e=>{breakAP();if(dlgAct)return;const r=cv.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;
+  for(const n of npcs){const s=n.sp;if(Math.sqrt((mx-s.x)**2+(my-(s.y-20))**2)<30&&player.dist(n)<3){openDlg(n);return}}});
+function talkNear(){let nr=null,md=3;for(const n of npcs){const d=player.dist(n);if(d<md){md=d;nr=n}}if(nr)openDlg(nr)}
+
+// ==================== 对话 ====================
+function genR(txt,npc){const p=NPC_P[npc.name];if(!p)return'...';let t='general';
+  if(/你好|嗨|hi|hello|嘿|早|在吗/.test(txt))t='greet';
+  else if(/机器人|robot|舵机|传感器|3D打印|电路|硬件|PCB|焊接|嵌入式|主板/.test(txt))t='robot';
+  else if(/课程|教学|教案|学生|教育|课堂|课件|培训|老师|学校|青少年|孩子|学员|初中|小学|中学|年龄|客户需求/.test(txt))t='course';
+  else if(/智能体|模型|训练|平台|agent|AI|大模型|部署|prompt|RAG/.test(txt))t='agent';
+  else if(/工作|忙|任务|项目|代码|开发|编程|bug|功能|在做|干嘛|需求|评审/.test(txt))t='work';
+  else if(/吃|喝|饿|咖啡|食物|餐|饭|零食/.test(txt))t='food';
+  else if(/累|休息|困|疲惫|放松|疲倦/.test(txt))t='tired';
+  else if(/会议|开会|meeting|讨论/.test(txt))t='meeting';
+  else if(/你是谁|介绍|名字|叫什么|自我/.test(txt))t='intro';
+  else if(/公司|lebot|产品/.test(txt))t='company';
+  else if(/谢|thanks|thank/.test(txt))t='thanks';
+  else if(/再见|拜拜|bye|回头|走了/.test(txt))t='bye';
+  const rs=p.r[t]||p.r.general;return rs[Math.floor(Math.random()*rs.length)]}
+function openDlg(npc){dlgAct=true;actNPC=npc;document.getElementById('dialogBox').style.display='block';document.getElementById('npcDot').style.backgroundColor=npc.cl.body;document.getElementById('npcNameLabel').textContent=npc.name+' - '+npc.title;const h=document.getElementById('chatHistory');h.innerHTML='';aCM(npc.name,npc.greet(),'n');const qo=document.getElementById('quickOpts');qo.innerHTML='';['你好！','在忙什么？','聊聊AI产品？','再见！'].forEach(t=>{const d=document.createElement('div');d.className='quick-opt';d.textContent=t;d.addEventListener('click',()=>sMsg(t));qo.appendChild(d)});document.getElementById('chatInput').value='';document.getElementById('chatInput').focus()}
+function aCM(name,text,type){const h=document.getElementById('chatHistory');const d=document.createElement('div');d.className='chat-msg '+(type==='p'?'p':'n');d.innerHTML='<span class="s">'+name+'：</span>'+text;h.appendChild(d);h.scrollTop=h.scrollHeight}
+function sMsg(text){if(!text.trim()||!actNPC)return;aCM('Alex',text,'p');feedChat('Alex',text);setTimeout(()=>{const r=genR(text,actNPC);aCM(actNPC.name,r,'n');feedChat(actNPC.name,r)},300+Math.random()*500);document.getElementById('chatInput').value=''}
+document.addEventListener('DOMContentLoaded',()=>{document.getElementById('chatInput').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();sMsg(e.target.value)}})});
+function closeDialog(){dlgAct=false;actNPC=null;document.getElementById('dialogBox').style.display='none'}
+NPC.prototype.greet=function(){const p=NPC_P[this.name];if(p)return p.greet[Math.floor(Math.random()*p.greet.length)];return'你好！'};
+
+// ==================== 玩家移动 ====================
+function uP(dt){
+  if(dlgAct)return;
+  if(ap.active){updateAP(dt);
+    const gc=Math.round(player.col),gr=Math.round(player.row);
+    if(gc>=0&&gc<MC&&gr>=0&&gr<MR)document.getElementById('roomLabel').textContent=RC[grk(gr,gc)]?RC[grk(gr,gc)].label:'走廊';
+    return}
+  const elapsed=(performance.now()-ap.lastInput)/1000;
+  if(elapsed>20){activateAP();return}
+  let dc=0,dr=0;
+  if(keys['w']||keys['arrowup']){dc-=1;dr-=1}if(keys['s']||keys['arrowdown']){dc+=1;dr+=1}
+  if(keys['a']||keys['arrowleft']){dc-=1;dr+=1}if(keys['d']||keys['arrowright']){dc+=1;dr-=1}
+  if(dc||dr){const l=Math.sqrt(dc*dc+dr*dr);dc/=l;dr/=l;const sp=SPD*dt;let nx=player.col+dc*sp,ny=player.row+dr*sp;const w=rWalls(player.col,player.row,nx,ny);nx=w.col;ny=w.row;if(canWalk(nx,ny)){player.col=nx;player.row=ny}else if(canWalk(nx,player.row)){player.col=nx}else if(canWalk(player.col,ny)){player.row=ny}}
+  const gc=Math.round(player.col),gr=Math.round(player.row);
+  if(gc>=0&&gc<MC&&gr>=0&&gr<MR)document.getElementById('roomLabel').textContent=RC[grk(gr,gc)]?RC[grk(gr,gc)].label:'走廊';
+}
+
+// ==================== 门动画 ====================
+function uD(dt){for(const[id,d]of Object.entries(DD)){const cc=dcx(d);let near=false;if(Math.sqrt((player.col-cc)**2+(player.row-d.y)**2)<2)near=true;for(const n of npcs)if(Math.sqrt((n.col-cc)**2+(n.row-d.y)**2)<2)near=true;if(near)d.anim=Math.min(1,d.anim+dt*3);else d.anim=Math.max(0,d.anim-dt*2);d.open=d.anim>.8}}
+
+// ==================== 镜头 ====================
+function uC(){const tx=(player.col-player.row)*(TW/2),ty=(player.col+player.row)*(TH/2);camX+=(tx-camX)*.15;camY+=(ty-camY)*.15}
+
+// ==================== 小地图 ====================
+function dM(){const mw=180,mh=160,sx=mw/MC,sy=mh/MR;mx.fillStyle='#1A1A2E';mx.fillRect(0,0,mw,mh);for(let r=0;r<MR;r++)for(let c=0;c<MC;c++){mx.fillStyle=RC[grk(r,c)].floor;mx.fillRect(c*sx,r*sy,sx-.5,sy-.5)}mx.fillStyle='rgba(0,0,0,0.3)';FL.forEach(f=>{if(!f.noBlock)for(let dr=0;dr<f.h;dr++)for(let dc=0;dc<f.w;dc++)mx.fillRect((f.col+dc)*sx,(f.row+dr)*sy,sx,sy)});for(const[id,d]of Object.entries(DD)){mx.fillStyle=d.anim>.8?'rgba(80,200,80,0.7)':'rgba(200,100,50,0.7)';mx.fillRect(d.x1*sx,(d.y-.3)*sy,(d.x2-d.x1)*sx,sy*.6)}npcs.forEach(n=>{mx.fillStyle=n.cl.body;mx.beginPath();mx.arc(n.col*sx,n.row*sy,3,0,Math.PI*2);mx.fill()});mx.fillStyle='#4A90D9';mx.strokeStyle='#FFF';mx.lineWidth=1.5;mx.beginPath();mx.arc(player.col*sx,player.row*sy,4,0,Math.PI*2);mx.fill();mx.stroke()}
+
+// ==================== 主渲染 ====================
+function gE(){const els=[];FL.forEach(f=>els.push({t:'f',it:f,d:f.col+f.row}));els.push({t:'p',ch:player,d:player.col+player.row});npcs.forEach(n=>els.push({t:'n',ch:n,d:n.col+n.row}));return els.sort((a,b)=>a.d-b.d)}
+function render(){cx.clearRect(0,0,cv.width,cv.height);const bg=cx.createLinearGradient(0,0,0,cv.height);bg.addColorStop(0,'#2A2A3E');bg.addColorStop(1,'#1A1A2E');cx.fillStyle=bg;cx.fillRect(0,0,cv.width,cv.height);drawFloor();drawLabels();drawWalls();drawDoors();gE().forEach(el=>{if(el.t==='f')dFI(el.it);else if(el.t==='p')el.ch.draw();else if(el.t==='n'){el.ch.draw();if(player.dist(el.ch)<3&&!dlgAct){const s=el.ch.sp;cx.fillStyle='rgba(255,255,255,0.8)';cx.font='10px "PingFang SC"';cx.textAlign='center';cx.fillText('点击对话',s.x,s.y-50)}const s=el.ch.sp;const em={idle:'💤',working:'💻',testing:'🤖',lab_work:'🔧',kitchen:'☕',course_dev:'📚',meeting_state:'📋',event:'📢'};cx.font='12px Arial';cx.textAlign='center';cx.fillText(em[el.ch.state]||'💤',s.x+18,s.y-35)}})}
+
+// ==================== 游戏循环 ====================
+function loop(ts){if(!started){requestAnimationFrame(loop);return}const dt=Math.min((ts-lastT)/1000,.05);lastT=ts;fc++;uP(dt);npcs.forEach(n=>n.update(dt));uD(dt);tryNPCChat(dt);updateGEVT(dt);uC();render();if(fc%15===0)dM();requestAnimationFrame(loop)}
+function startGame(){document.getElementById('title-screen').style.display='none';initGame();started=true;lastT=performance.now()}
+requestAnimationFrame(loop);window.startGame=startGame;window.closeDialog=closeDialog;
+</script>
+</body>
+</html>
