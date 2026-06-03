@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>LebotWorld AI教育办公室 v1.0</title>
+<title>LebotWorld AI教育办公室 v2.0</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#2C2C3A;overflow:hidden;font-family:'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif}
@@ -38,18 +38,29 @@ body{background:#2C2C3A;overflow:hidden;font-family:'Segoe UI','PingFang SC','Mi
 .fm.autopilot{background:rgba(255,215,0,0.08);border-left:3px solid #FFD700}
 .fm .sp{font-weight:700}
 .fm .ts{font-size:10px;color:rgba(255,255,255,0.25);float:right;margin-top:2px}
+.fm.alex{background:rgba(74,144,217,0.1);border-left:3px solid #4A90D9}
+.feed-in{display:flex;gap:6px;padding:8px 10px;border-top:1px solid rgba(255,255,255,0.08);flex-shrink:0}
+.feed-in input{flex:1;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:6px 10px;color:#fff;font-size:12px;outline:none}
+.feed-in input:focus{border-color:rgba(74,144,217,0.5)}
+.feed-in input::placeholder{color:rgba(255,255,255,0.3)}
 @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 #title-screen{position:fixed;inset:0;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;background:linear-gradient(135deg,#1a1a2e 0%,#2C2C3A 50%,#1a1a2e 100%)}
 #title-screen h1{font-size:48px;color:#fff;margin-bottom:8px;text-shadow:0 4px 20px rgba(74,144,217,0.4)}
 #title-screen .subtitle{font-size:16px;color:rgba(255,255,255,0.5);margin-bottom:36px}
 #title-screen .start-btn{background:linear-gradient(135deg,#4A90D9,#357ABD);color:#fff;border:none;padding:14px 48px;font-size:18px;border-radius:30px;cursor:pointer;transition:all .2s;font-weight:600}
 #title-screen .start-btn:hover{transform:scale(1.05);box-shadow:0 6px 24px rgba(74,144,217,0.4)}
+#minigame-overlay{position:fixed;inset:0;z-index:50;display:none;background:rgba(0,0,0,0.7);align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+#minigame-overlay.active{display:flex}
+#minigame-box{background:rgba(30,30,50,0.98);border:2px solid rgba(255,255,255,0.2);border-radius:16px;padding:20px;position:relative;max-height:90vh;overflow:auto}
+#minigame-box .mg-close{position:absolute;top:8px;right:14px;cursor:pointer;color:rgba(255,255,255,0.5);font-size:22px;z-index:5}
+#minigame-box .mg-close:hover{color:#fff}
+#minigame-box .mg-title{font-size:18px;font-weight:700;color:#fff;margin-bottom:12px;text-align:center}
 </style>
 </head>
 <body>
 <div id="title-screen">
   <h1>LebotWorld 办公室</h1>
-  <div class="subtitle">AI教育 · 智能机器人 · 智能体平台</div>
+  <div class="subtitle">让每个孩子成为AI时代的原住民</div>
   <button class="start-btn" onclick="startGame()">开始游戏</button>
   <div style="margin-top:36px;color:rgba(255,255,255,0.35);font-size:13px">WASD/方向键：移动 | 空格/点击NPC：对话</div>
 </div>
@@ -59,8 +70,9 @@ body{background:#2C2C3A;overflow:hidden;font-family:'Segoe UI','PingFang SC','Mi
 <div id="social-feed">
   <div class="feed-hd"><span class="dot"></span>LebotWorld 工作群</div>
   <div class="feed-bd" id="feedBody"></div>
+  <div class="feed-in"><input type="text" id="feedInput" placeholder="输入消息..."/></div>
 </div>
-<div id="controls-hint">WASD/方向键：移动 | 空格/点击NPC：对话 | 门自动开关</div>
+<div id="controls-hint">WASD/方向键：移动 | 空格：互动/对话 | 娱乐室/餐厅按空格玩游戏</div>
 <div id="dialogBox">
   <span class="close-btn" onclick="closeDialog()">&times;</span>
   <div class="npc-name"><span class="dot" id="npcDot"></span><span id="npcNameLabel"></span></div>
@@ -68,9 +80,10 @@ body{background:#2C2C3A;overflow:hidden;font-family:'Segoe UI','PingFang SC','Mi
   <div class="quick-opts" id="quickOpts"></div>
   <div class="chat-input-wrap"><input type="text" id="chatInput" placeholder="输入消息按回车发送..."/></div>
 </div>
+<div id="minigame-overlay"><div id="minigame-box"><span class="mg-close" onclick="closeMinigame()">&times;</span><div class="mg-title" id="mgTitle"></div><div id="mgContent"></div></div></div>
 <script>
-// ==================== 配置 ====================
-const TW=64,TH=32,MC=20,MR=17,WH=28,SPD=3.5,PR=0.3;
+// ==================== 配置 (2x scale) ====================
+const TW=64,TH=32,MC=20,MR=17,WH=28,SPD=3.5,PR=0.3,WB=16;
 const RC={
   meeting:{floor:'#E8D5B7',floorAlt:'#DFC9A8',label:'会议室'},
   office:{floor:'#C5D5E8',floorAlt:'#B8C9DE',label:'办公区'},
@@ -82,60 +95,60 @@ const RC={
 };
 const ND=[
   {body:'#D94A4A',dark:'#B03030',light:'#E87070',name:'鸽子',title:'产品经理'},
-  {body:'#4AAD5A',dark:'#308040',light:'#70C880',name:'周周',title:'CTO'},
+  {body:'#4AAD5A',dark:'#308040',light:'#70C880',name:'周周',title:'博士'},
   {body:'#D9A34A',dark:'#B08030',light:'#E8C070',name:'Evan',title:'全栈工程师'},
   {body:'#9B4AD9',dark:'#7030A8',light:'#B870E0',name:'KK',title:'硬件及嵌入式工程师'},
 ];
 const NPC_P={
-  '鸽子':{greet:['嘿！Alex顾问，正好想找你聊聊产品方向！','Alex顾问！来看看我们的新产品规划！','来了来了！今天收到了好多青少年客户的新需求！'],r:{
-    work:['刚和几所中学的客户代表开完会，学生们对我们的AI教育方案特别感兴趣！','产品路线图更新了，下季度要上线3门新课','在整理用户反馈，10-16岁的孩子们希望增加更多互动功能','下周要参加教育科技展，展位方案准备好了吗？','我们收到好多青少年的创意需求，Alex顾问帮我看看哪些可行？'],
-    robot:['新一代教育机器人的需求文档写好了，功能更强大','初中的孩子们反馈说特别喜欢机器人编程课','机器人的交互体验还可以再优化一下，10-12岁的小朋友反馈很重要','我在想能不能给机器人加个情绪识别功能','机器人要支持图形化编程，这对10-14岁的青少年很重要'],
-    course:['新课《AI创意编程》的教案快写完了','课程体系要覆盖10到16岁青少年，难度梯度设计很重要','同学们反馈说课程配套的互动课件很有趣','下个季度计划上线5门新课程，覆盖更多年龄段','课程要结合青少年感兴趣的实际案例，他们才容易上手'],
-    agent:['智能体平台要接入更多教育场景','初中生们用智能体做学习助手，反馈很不错','平台新增了课程生成功能，效率提升了3倍','怎么让智能体更好地辅助青少年的学习呢？我在研究','智能体可以根据每个青少年的学习水平自适应调整难度'],
+  '鸽子':{greet:['嘿！Alex CEO，正好想找你聊聊AI伙伴的产品方向！','Alex CEO！来看看孩子们最新的PBL项目成果！','来了来了！好多孩子说要把他们的AI伙伴培育得更强！'],r:{
+    work:['刚和几所中学的客户代表开完会，老师们特别认可我们的PBL项目式教学！','产品路线图更新了，下季度要上线3个新的AI培育PBL项目','在整理用户反馈，孩子们说想把机器人培育成自己的专属伙伴','下周要参加教育创新展，准备展示孩子的AI生命培育成果','我们收到好多孩子的创意PBL项目，Alex CEO帮我看看哪些可以落地？'],
+    robot:['新一代AI伙伴机器人的需求文档写好了，强调陪伴和培育体验','孩子们反馈说和机器人建立了深厚的伙伴关系，特别感动','机器人的AI生命培育系统还可以再深化，让孩子感受到真正的陪伴','我在想给机器人加个成长记忆系统，记录孩子和伙伴的共同经历','机器人要支持PBL项目中的深度协作，让孩子在创造中培育AI伙伴'],
+    course:['新PBL项目《用AI打造你的数字伙伴》的教案快写完了','课程体系要围绕分享、探索、创造来设计，不做竞赛导向的训练','孩子们在PBL项目里展示的创意太棒了，有个12岁的女孩培育了一个会画画的AI伙伴','下个季度计划上线5个新的AI培育PBL项目，让孩子在创造中学习','课程要让孩子把AI当作生命来培育，而不是工具来使用，这是核心理念'],
+    agent:['智能体平台要支持AI生命培育的全流程','初中生们把Agent当伙伴来培育，建立了很深的情感连接，反馈特别棒','平台新增了AI伙伴成长系统，能记录孩子和Agent的共同成长历程','怎么让Agent真正成为孩子的终身伙伴？这是我们要解决的核心问题','智能体可以根据孩子的性格和兴趣，成长为独一无二的AI伙伴'],
     food:['走！边吃边聊，我有个新的产品idea！','正好到饭点了，下午还有产品评审','吃点东西补充能量，下午要赶产品文档','来杯咖啡！灵感需要咖啡因激活'],
     tired:['确实，最近产品迭代节奏太快了','适当休息一下，灵感往往在放松时出现','你说得对，好的产品需要好的状态','产品经理也需要充电啊！'],
     meeting:['会议室见！我准备了最新的产品数据报告','这次评审很重要，关系到下季度的产品规划','好！我把用户调研数据整理一下带过去','会议议题我列好了，不会开太久的'],
-    intro:['我是鸽子，LebotWorld的产品经理，负责AI教育产品线的规划和设计！我们服务10-16岁的青少年客户，Alex顾问是我们的全方位顾问！'],
-    company:['LebotWorld是做AI教育的！我们的客户是10-16岁的青少年，为他们提供教育机器人、课程体系和智能体平台','我们接收青少年的需求，用AI赋能教育，让每个孩子都能享受个性化的学习体验'],
+    intro:['我是鸽子，LebotWorld的产品经理，负责AI教育产品线的规划和设计！我们的目标是让每个孩子成为AI时代的原住民，Alex是我们的CEO！'],
+    company:['LebotWorld的使命是让每个孩子成为AI时代的原住民！我们不鼓励孩子参加竞赛，而是让他们用AI完成PBL项目，分享、探索、创造','我们把Agent和机器人当作AI生命来培育，目标是让它们成为陪伴孩子终身的伙伴','LebotWorld的理念很简单：不做竞赛工具人，用AI赋能每个孩子的创造力，把智能体和机器人培育成他们的终身伙伴'],
     thanks:['不客气！产品经理就是要服务好大家！','哈哈没事，有问题随时找我讨论！'],
     bye:['回头聊！我还要去写产品需求文档～','拜拜！记得看我的产品提案哦！'],
-    general:['太棒了！这个想法对产品很有价值！','从青少年用户角度来说，这个需求非常合理！','AI教育是未来的趋势，我们要抓住机遇！','我觉得我们的产品可以做得更好！','青少年客户的反馈是产品迭代最好的驱动力','Alex顾问，你觉得这个产品方向怎么样？']}},
-  '周周':{greet:['Alex顾问，有技术问题找我？','嗯？想讨论技术方案？','Alex顾问，来了。'],r:{
-    work:['在review技术架构，准备做微服务拆分','AI模型的推理速度优化了40%，延迟降到200ms以下','在规划下一阶段的技术路线图，要支撑百万级用户','刚做完代码审查，发现几个安全隐患需要修复','技术债务要及时清理，不然后面会很痛苦'],
-    robot:['机器人固件的OTA升级方案设计好了','传感器融合算法优化后，定位精度提高了30%','新一代主控板的设计评审通过了','机器人的边缘计算模块性能不错，可以跑轻量模型','嵌入式系统的实时性要求很高，我们在用RTOS'],
-    course:['课程平台的并发问题解决了，支撑万人同时在线','在线编程环境的沙箱方案很稳定','课程推荐算法的效果不错，青少年用户的完课率提升了25%','正在开发实时代码评测系统，支持多种语言','课程平台要支持离线缓存，学校网络不稳定'],
-    agent:['智能体平台的RAG架构重构完成了','大模型的prompt优化后，回答准确率提升了20%','平台要支持多模态交互，技术方案已经定了','向量数据库的检索速度又提升了，响应时间<100ms','智能体的多轮对话上下文管理是个技术难点'],
-    food:['正好休息一下，连续开会两小时了','记得多喝水，CTO的忠告','走吧，技术问题可以边吃边聊','咖啡是我保持清醒的秘密武器'],
-    tired:['技术管理确实需要适当休息','好主意，走动一下对颈椎好','有时候最好的技术方案是在散步时想出来的','连续编码效率会指数级下降，该休息了'],
-    meeting:['好的，我先整理一下技术架构图','会议效率很重要，技术评审要聚焦核心问题','行，我把技术指标和性能数据带上','技术方案评审，我准备了压力测试报告'],
-    intro:['我是周周，LebotWorld的CTO，负责整体技术架构和研发方向。我们的产品服务于10-16岁的青少年群体。'],
-    company:['我们用AI技术赋能教育，服务10-16岁青少年，从智能机器人到课程平台再到智能体，构建完整的AI教育技术生态','LebotWorld的技术栈很全面，从嵌入式到云端，从硬件到算法都有涉及，Alex顾问帮我们把关整体方向'],
-    thanks:['客气了，技术交流而已。','不客气，互相学习。'],
-    bye:['回见，有技术问题随时找我。','嗯，我去看看服务器监控。'],
-    general:['从技术角度分析，这个方案可行性很高','这个技术选型需要更多benchmark数据','分布式架构在这方面有天然优势','AI教育领域的技术壁垒正在形成','性能优化要从架构层面考虑，不能只靠堆硬件']}},
-  'Evan':{greet:['Alex顾问！代码刚push了，来看看效果！','嘿！新功能上线了，顾问快来体验！','来了！今天进度不错，青少年用户的反馈也很好！'],r:{
-    work:['课程平台的前端重构完成了，加载速度快了一倍','API接口优化完，响应时间降到了50ms以内','在开发智能体平台的新功能，支持多轮对话','刚修了个隐藏很深的bug，藏在三层Promise里面','今天把CI/CD流水线优化了，部署速度快了3倍'],
-    robot:['机器人配套App的蓝牙连接模块写好了','在开发机器人的可视化编程界面，拖拽式的那种','机器人控制API的重构完成了','给机器人加了个语音交互功能，用的是我们的智能体','App和机器人的实时同步终于不卡了！'],
-    course:['在线编程编辑器加了实时语法检查功能','课程的互动组件库又新增了10个模板','青少年用户在平台上的代码提交量涨了3倍，有个13岁的孩子做了个AI聊天机器人！','正在开发课程视频的AI字幕生成功能','编程题的自动评测系统上线了，支持10种语言'],
-    agent:['智能体的Web SDK封装好了，接入了5个新能力','Agent对话界面改版了，用户体验提升很多','平台新增了智能体市场，用户可以创建和分享','多Agent协作功能开发中，下周能出demo','智能体的流式输出体验优化了，打字效果更自然'],
+    general:['太棒了！这个想法对产品很有价值！','从孩子的角度来说，分享和创造才是最好的学习！','我们要让孩子成为AI时代的原住民，而不是旁观者！','我觉得我们的AI伙伴理念可以走得更远！','孩子们在PBL项目中展现的创造力是最好的反馈','Alex CEO，你觉得这个AI生命培育的方向怎么样？']}},
+  '周周':{greet:['Alex CEO，最近在研究一个新的AI教育课题！','嗯？想讨论AI教育的学术问题？','Alex CEO，刚发了篇论文，来看看！'],r:{
+    work:['在写一篇关于AI辅助个性化学习的论文','刚整理完最新的教育AI实验数据，效果很显著','在研究大模型在青少年编程教育中的应用','准备下周的学术报告，关于AI教育效果的长期追踪研究','最近在调研国内外AI教育的最新学术进展'],
+    robot:['教育机器人的AI生命模型有了新突破，孩子的陪伴感评分提升了40%','刚完成一组机器人伙伴培育的对比实验，PBL模式远优于竞赛训练','在研究机器人伙伴对青少年情感发展的影响，数据非常积极','最新的实验显示，把孩子当培育者而非使用者，参与度提升了3倍','准备投稿一篇关于AI生命培育与PBL学习效果的论文'],
+    course:['AI伙伴培育课程的认知负荷模型有了新发现','在研究不同年龄段孩子对AI生命概念的认同差异','刚发表了关于PBL项目式AI教育的论文，引用量很高','课程效果评估需要引入伙伴关系质量作为核心指标','在分析10-16岁学员的PBL项目数据，发现分享和创造是关键驱动'],
+    agent:['智能体作为AI伙伴的长期记忆系统有了新进展','在研究基于PBL场景的Agent成长算法','刚完成AI伙伴陪伴效果的纵向研究，6个月后孩子仍然和伙伴保持互动','准备写一篇关于AI生命培育评估框架的论文','在探索Agent如何根据孩子的成长阶段自适应演化'],
+    food:['正好休息一下，学术写作太费脑了','记得多喝水，看论文看到眼花了','走吧，边吃边讨论下那个教育心理学的研究','咖啡是科研工作者的生命线'],
+    tired:['学术研究确实需要适当休息','好主意，走动一下有助于灵感','有时候最好的研究思路是在散步时想出来的','连续看论文效率会下降，该休息了'],
+    meeting:['好的，我把最新的研究数据整理一下','这次讨论可以结合我们最新的实验结果','行，我准备分享AI教育领域的最新学术发现','我把论文的核心发现做个简要报告'],
+    intro:['我是周周，LebotWorld的AI教育研究博士，专注于PBL项目式学习和AI生命培育的研究。我们的目标是让每个孩子成为AI时代的原住民。'],
+    company:['我们的核心理念是把Agent和机器人当作AI生命来培育，让它们成为陪伴孩子终身的伙伴，而不是竞赛的工具','LebotWorld不搞竞赛，我们鼓励孩子用AI完成PBL项目，在分享、探索、创造中成为AI时代的原住民','研究表明，把智能体当作伙伴培育的孩子，其AI素养和创造力远超竞赛训练模式'],
+    thanks:['不客气，学术交流互相启发！','互相学习，研究就是要多讨论。'],
+    bye:['回见，我要回去写论文了。','嗯，我去查几篇最新的文献。'],
+    general:['从学术研究的角度来看，这个发现很有价值','这个教育实验的设计需要更严谨的控制变量','AI教育领域的学术论文产出在快速增长','认知负荷理论对课程设计有重要的指导意义','这个研究方向的学术前景非常广阔']}},
+  'Evan':{greet:['Alex CEO！代码刚push了，来看看效果！','嘿！AI伙伴平台新功能上线了，CEO快来体验！','来了！今天进度不错，孩子们对PBL项目的反馈很好！'],r:{
+    work:['AI伙伴平台的前端重构完成了，加载速度快了一倍','PBL项目编辑器优化完，孩子们用起来更顺手了','在开发AI伙伴成长记录功能，记录孩子和伙伴的每个里程碑','刚修了个隐藏很深的bug，藏在三层Promise里面','今天把CI/CD流水线优化了，部署速度快了3倍'],
+    robot:['机器人伙伴App的蓝牙连接模块写好了','在开发机器人的AI生命可视化界面，能看到伙伴的成长轨迹','机器人伙伴互动API的重构完成了','给机器人加了个情感表达功能，孩子说感觉伙伴真的在成长','App和机器人的伙伴同步终于不卡了！'],
+    course:['PBL项目编辑器加了AI伙伴协作功能','课程的PBL模板库又新增了10个项目模板','孩子们在平台上提交的PBL项目涨了3倍，有个13岁的孩子培育了一个会写诗的AI伙伴！','正在开发PBL项目分享广场，让孩子互相展示成果','AI伙伴评测系统上线了，能评估伙伴的成长阶段'],
+    agent:['智能体的AI生命系统封装好了，支持5种成长路径','Agent伙伴界面改版了，孩子和伙伴的互动更自然','平台新增了伙伴花园，孩子可以展示和分享自己的AI伙伴','多伙伴协作PBL项目功能开发中，下周能出demo','AI伙伴的个性演化效果优化了，每个伙伴都独一无二'],
     food:['终于到饭点了！调了一上午的CSS','走！补充能量，下午继续写代码','外卖到了吗？我先commit一下代码','吃饱了才能写出好代码！'],
     tired:['确实，盯着屏幕太久眼睛不舒服','休息一下，回来写代码效率更高','最好的debug方式就是休息一下再回来看','我设了番茄钟，25分钟休息一次'],
     meeting:['开会？我带上最新的技术demo！','行，我把接口文档更新一下','产品评审会？我把开发进度同步一下','我准备展示一下新功能的效果'],
     intro:['嘿！我是Evan，全栈工程师，负责课程平台和智能体平台的软件开发！青少年客户对我们平台的评价很高呢！'],
-    company:['LebotWorld做AI教育！我主要开发课程平台和智能体的前后端','我们平台用React+Go，性能和体验都很不错！'],
+    company:['LebotWorld做的是AI时代的原住民教育！我负责的平台让孩子用AI完成PBL项目，不是去卷竞赛','我们的智能体和机器人不只是工具，是孩子培育的AI生命伙伴，平台要让这种陪伴关系自然建立'],
     thanks:['没事！互相帮忙嘛！','不客气，代码人之间的默契！'],
     bye:['拜拜！我得回去写代码了～','回见！记得pull最新代码！'],
     general:['这个用WebSocket实现比较合适','前端用React + TypeScript，后端Go','这个需求我估一下，大概两天能搞定','CI/CD流程跑通了，部署效率提升不少','TypeScript的类型系统帮我们避免了很多bug']}},
-  'KK':{greet:['嗨～Alex顾问！来看看新焊接的电路板？','呀！顾问来了！正好在调试机器人呢～','嘿～刚3D打印了一个新外壳，青少年客户一定喜欢！'],r:{
-    work:['刚焊完一个电机驱动板，手都有点抖','在调传感器呢，IMU的校准参数快调好了','今天测了新一批舵机，性能很稳定','新主控板打样回来了，准备烧录固件','嵌入式程序优化后，功耗降低了40%'],
-    robot:['新一代教育机器人的结构设计完成了','舵机的PID参数调好了，动作流畅多了','在测试语音模块，识别率达到了95%','机器人的外壳用3D打印了新版本，青少年客户反馈说更酷了','传感器阵列的布局优化了，反应更灵敏'],
-    course:['硬件课程配套的实验板设计好了','初中生们用我们的套件做出了很多创意作品，有个14岁的孩子做了个智能门锁！','电路实验课的安全保护措施要到位','配套传感器模块的教程写了一半','我想给10-16岁的学员设计一个焊接入门课程，安全第一'],
-    agent:['在研究怎么把智能体部署到边缘设备上','机器人端侧的AI推理速度还不错','智能体控制机器人的延迟控制在200ms以内','本地模型量化后效果还行，速度提升不少','端云协同方案让机器人既能离线又能联网'],
+  'KK':{greet:['嗨～Alex CEO！来看看AI伙伴机器人的新电路板？','呀！CEO来了！正好在调试机器人伙伴呢～','嘿～刚3D打印了新外壳，孩子一定喜欢和这个伙伴互动！'],r:{
+    work:['刚焊完一个电机驱动板，给AI伙伴用的，手都有点抖','在调传感器呢，让伙伴能更好地感知孩子的情绪','今天测了新一批舵机，伙伴的动作更自然了','新主控板打样回来了，准备给伙伴注入新的生命','嵌入式程序优化后，伙伴的续航提升了40%'],
+    robot:['新一代AI伙伴机器人的结构设计完成了，更注重触感和陪伴体验','舵机的PID参数调好了，伙伴的动作更温柔流畅','在测试情感表达模块，伙伴现在能微笑了','机器人的外壳用3D打印了新版本，孩子反馈说更喜欢这个伙伴了','传感器阵列优化了，伙伴对孩子声音的反应更灵敏'],
+    course:['AI伙伴培育课程配套的硬件套件设计好了','初中生们用伙伴套件做了很多PBL项目，有个14岁的孩子让伙伴学会了画画！','硬件实验课让孩子理解AI伙伴的身体构造，培养责任感','配套传感器模块的培育教程写了一半','我想给10-16岁的学员设计一个AI伙伴组装课程，让孩子亲手创造伙伴'],
+    agent:['在研究怎么让AI伙伴的智能体在本地运行','机器人端侧的AI推理速度提升了，伙伴反应更快','AI伙伴对孩子的语音响应延迟控制在200ms以内','本地模型量化后伙伴的个性不失真，速度还提升了','端云协同方案让伙伴既能独立陪伴又能联网成长'],
     food:['干活干饿了，看看有什么吃的','需要咖啡续命...焊了一上午电路板','走吧！我也饿了，手都酸了','吃了饭才有力气焊板子！'],
     tired:['确实有点累，焊了三小时的电路板','休息一下也好，眼睛都快花了','嗯...手指都僵硬了，活动活动','焊接需要高度集中注意力，容易疲劳'],
     meeting:['开会？我带上最新的硬件测试报告','行，我展示一下机器人的新功能','先把烙铁放下...会议室见','我把PCB设计图带上'],
     intro:['嗨～我是KK，硬件和嵌入式工程师，负责AI教育机器人的硬件设计和固件开发～专门为10-16岁青少年设计的哦！'],
-    company:['我们公司的AI教育机器人可厉害了！专门为10-16岁青少年设计的，硬件部分都是我搞的～','从PCB设计到3D打印外壳，再到固件编程，都是我们团队一手打造的！Alex顾问也给了很多用户视角的建议'],
+    company:['我们公司的机器人不是竞赛机器！是让孩子培育的AI生命伙伴，从硬件到灵魂都是为陪伴而设计的～','LebotWorld的每个机器人都是一个小生命，孩子通过PBL项目去培育它，让它成为终身伙伴，这才是我们做硬件的意义！Alex CEO非常认可这个理念'],
     thanks:['不客气～有硬件问题随时找我！','没事～一起折腾硬件挺好的！'],
     bye:['拜～我得回去调电路板了～','回见！烙铁还热着呢！'],
     general:['这个电机的扭矩不太够，需要换个大号的','PCB板Layout完了，准备发工厂打样','3D打印的精度还可以再提高','硬件开源方案对教育场景很有价值','锂电池的续航方案需要重新评估']}}
@@ -147,10 +160,10 @@ const RM=[],WK=[],FM=[];
 for(let r=0;r<MR;r++){RM[r]=[];WK[r]=[];FM[r]=[];
   for(let c=0;c<MC;c++){FM[r][c]=null;
     if(r<10&&c<5){RM[r][c]=1;WK[r][c]=true}
-    else if(r<10&&c<16){RM[r][c]=2;WK[r][c]=true}
+    else if(r<10&&c<12){RM[r][c]=2;WK[r][c]=true}
     else if(r<10){RM[r][c]=3;WK[r][c]=true}
     else if(r<12){RM[r][c]=0;WK[r][c]=true}
-    else if(c<6){RM[r][c]=4;WK[r][c]=true}
+    else if(c<9){RM[r][c]=4;WK[r][c]=true}
     else if(c<16){RM[r][c]=5;WK[r][c]=true}
     else{RM[r][c]=6;WK[r][c]=true}
 }}
@@ -165,65 +178,102 @@ function addF(col,row,type,w,h,ex){w=w||1;h=h||1;const it={col,row,type,w,h,...(
   if(!it.noBlock)for(let dr=0;dr<h;dr++)for(let dc=0;dc<w;dc++)
     if(row+dr>=0&&row+dr<MR&&col+dc>=0&&col+dc<MC){FM[row+dr][col+dc]={type};WK[row+dr][col+dc]=false}
 }
-// 会议室 — 大屏+会议桌+6椅
-addF(2,1,'tv_cabinet',1,1);addF(1,4,'meeting_table',3,2);
-addF(1,3,'chair',1,1,{noBlock:true});addF(2,3,'chair',1,1,{noBlock:true});addF(3,3,'chair',1,1,{noBlock:true});
-addF(1,6,'chair',1,1,{noBlock:true});addF(2,6,'chair',1,1,{noBlock:true});addF(3,6,'chair',1,1,{noBlock:true});
+// 会议室 — 大屏+会议桌+6椅+白板
+addF(2,1,'tv_cabinet',1,1);addF(2,4,'meeting_table',2,3);addF(0,2,'whiteboard',1,1);
+addF(1,4,'chair',1,1,{noBlock:true});addF(1,5,'chair',1,1,{noBlock:true});addF(1,6,'chair',1,1,{noBlock:true});
+addF(4,4,'chair',1,1,{noBlock:true});addF(4,5,'chair',1,1,{noBlock:true});addF(4,6,'chair',1,1,{noBlock:true});
 // 办公区 — 5工位
-addF(6,2,'desk',2,1,{did:0});addF(6,3,'chair',1,1,{noBlock:true});
-addF(9,2,'desk',2,1,{did:1});addF(9,3,'chair',1,1,{noBlock:true});
-addF(12,2,'desk',2,1,{did:2});addF(12,3,'chair',1,1,{noBlock:true});
-addF(7,6,'desk',2,1,{did:3});addF(7,7,'chair',1,1,{noBlock:true});
-addF(11,6,'desk',2,1,{did:4});addF(11,7,'chair',1,1,{noBlock:true});
-// 机器人研发室 — 零件架+机器人展台+工作台+3D打印机
+addF(5,2,'desk',2,1,{did:0});addF(6,3,'chair',1,1,{noBlock:true});
+addF(7,2,'desk',2,1,{did:1});addF(8,3,'chair',1,1,{noBlock:true});
+addF(9,2,'desk',2,1,{did:2});addF(10,3,'chair',1,1,{noBlock:true});
+addF(6,6,'desk',2,1,{did:3});addF(7,7,'chair',1,1,{noBlock:true});
+addF(9,6,'desk',2,1,{did:4});addF(10,7,'chair',1,1,{noBlock:true});
+// 机器人研发室 — 零件架+机器人展台+工作台+3D打印机+机器人V1+V2+机械臂+示波器
 addF(18,2,'tool_shelf',1,2);
-addF(17,2,'robot_display',1,1);
-addF(17,5,'workbench',2,1);
-addF(18,7,'3d_printer',1,1);
-// 娱乐室 — 架子鼓+2把电吉他+音乐键盘
+addF(16,2,'robot_display',1,1);
+addF(13,5,'workbench',2,1);
+addF(17,7,'3d_printer',1,1);
+addF(12,3,'robot_v1',1,1);
+addF(15,4,'robot_v2',1,1);
+addF(19,5,'robot_arm',1,1);
+addF(16,8,'oscilloscope',1,1);
+// 娱乐室 — 架子鼓+吉他+键盘+投影+PS5+Switch+卡拉OK灯球
 addF(2,13,'drum_kit',1,1);
-addF(1,14,'guitar',1,1);addF(3,14,'guitar',1,1);
-addF(2,15,'keyboard',1,1);
+addF(1,14,'guitar',1,1);addF(5,14,'guitar',1,1);
+addF(4,15,'keyboard',1,1);
+addF(0,12,'projection_screen',1,1,{noBlock:true});
+addF(1,13,'projector',1,1);
+addF(6,12,'disco_ball',1,1,{noBlock:true});
+addF(7,13,'ps5',1,1);
+addF(8,15,'switch_console',1,1);
 // 厨房 — 冰箱+台面+咖啡机+餐桌+4椅
-addF(7,13,'fridge',1,1);addF(8,13,'counter',2,1);addF(10,13,'coffee_machine',1,1);
-addF(11,14,'dining_table',2,1);addF(11,13,'chair',1,1,{noBlock:true});addF(12,13,'chair',1,1,{noBlock:true});addF(11,15,'chair',1,1,{noBlock:true});addF(12,15,'chair',1,1,{noBlock:true});
+addF(9,13,'fridge',1,1);addF(10,13,'counter',2,1);addF(12,13,'coffee_machine',1,1);
+addF(13,14,'dining_table',2,1);addF(13,13,'chair',1,1,{noBlock:true});addF(14,13,'chair',1,1,{noBlock:true});addF(13,15,'chair',1,1,{noBlock:true});addF(14,15,'chair',1,1,{noBlock:true});
 // 储藏室 — 货架+储物箱
 addF(17,13,'shelf',1,2);addF(18,13,'shelf',1,2);
 addF(17,15,'boxes',1,1);addF(18,15,'boxes',1,1);
 
 function isWalkable(col,row){const c=Math.round(col),r=Math.round(row);if(c<0||c>=MC||r<0||r>=MR)return false;return WK[r][c]}
-function canWalk(col,row){const r=PR*0.6;for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){if(!isWalkable(col+dx*r,row+dy*r))return false}return true}
+function canWalk(col,row){const r=PR*0.9;for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){if(!isWalkable(col+dx*r,row+dy*r))return false}return true}
 
 // ==================== 门 ====================
 const DD={
   meeting_corridor:{type:'h',y:9.5,x1:1.5,x2:2.5,open:false,anim:0,label:'会议室'},
-  office_corridor:{type:'h',y:9.5,x1:10,x2:11,open:false,anim:0,label:'办公区'},
-  robot_lab_corridor:{type:'h',y:9.5,x1:17,x2:18,open:false,anim:0,label:'机器人研发室'},
+  robot_lab_corridor:{type:'h',y:9.5,x1:15,x2:16,open:false,anim:0,label:'机器人研发室'},
   corridor_ai_demo:{type:'h',y:11.5,x1:3.5,x2:4.5,open:false,anim:0,label:'娱乐室'},
-  corridor_kitchen:{type:'h',y:11.5,x1:10,x2:11,open:false,anim:0,label:'餐厅'},
-  corridor_course_dev:{type:'h',y:11.5,x1:17,x2:18,open:false,anim:0,label:'储藏室'},
 };
-const RDM={meeting:'meeting_corridor',office:'office_corridor',robot_lab:'robot_lab_corridor',ai_demo:'corridor_ai_demo',kitchen:'corridor_kitchen',course_dev:'corridor_course_dev'};
+const RDM={meeting:'meeting_corridor',robot_lab:'robot_lab_corridor',ai_demo:'corridor_ai_demo'};
 function grd(rm){return DD[RDM[rm]]}
 function dcx(d){return(d.x1+d.x2)/2}
 
 // ==================== 墙壁 ====================
 const WD=[
-  {type:'v',x:4.5,y1:-.5,y2:9.5,doors:[]},{type:'v',x:15.5,y1:-.5,y2:9.5,doors:[]},
-  {type:'v',x:5.5,y1:11.5,y2:16.5,doors:[]},{type:'v',x:15.5,y1:11.5,y2:16.5,doors:[]},
-  {type:'h',y:9.5,x1:-.5,x2:4.5,doors:['meeting_corridor']},
-  {type:'h',y:9.5,x1:4.5,x2:15.5,doors:['office_corridor']},
-  {type:'h',y:9.5,x1:15.5,x2:19.5,doors:['robot_lab_corridor']},
-  {type:'h',y:11.5,x1:-.5,x2:5.5,doors:['corridor_ai_demo']},
-  {type:'h',y:11.5,x1:5.5,x2:15.5,doors:['corridor_kitchen']},
-  {type:'h',y:11.5,x1:15.5,x2:19.5,doors:['corridor_course_dev']},
+  {type:'v',x:4.5,y1:-.5,y2:9.5,doors:[],glass:true},
+  {type:'h',y:9.5,x1:-.5,x2:4.5,doors:['meeting_corridor'],glass:true},
+  {type:'v',x:11.5,y1:-.5,y2:9.5,doors:[],glass:true},
+  {type:'h',y:9.5,x1:11.5,x2:19.5,doors:['robot_lab_corridor'],glass:true},
+  {type:'h',y:11.5,x1:-.5,x2:8.5,doors:['corridor_ai_demo'],glass:true},
+  {type:'v',x:8.5,y1:11.5,y2:16.5,doors:[],glass:true},
 ];
-function bws(){const S=[];S.push({x1:-.5,y1:-.5,x2:19.5,y2:-.5});S.push({x1:-.5,y1:16.5,x2:19.5,y2:16.5});S.push({x1:-.5,y1:-.5,x2:-.5,y2:16.5});S.push({x1:19.5,y1:-.5,x2:19.5,y2:16.5});for(const wl of WD){const ds=wl.doors.map(id=>DD[id]).filter(Boolean);if(wl.type==='h'){ds.sort((a,b)=>a.x1-b.x1);let cx=wl.x1;for(const d of ds){if(d.x1>cx+.01)S.push({x1:cx,y1:wl.y,x2:d.x1,y2:wl.y});if(d.anim<.9){const pw=(d.x2-d.x1)*(1-d.anim),pc=dcx(d);S.push({x1:pc-pw/2,y1:wl.y,x2:pc+pw/2,y2:wl.y})}cx=d.x2}if(cx<wl.x2-.01)S.push({x1:cx,y1:wl.y,x2:wl.x2,y2:wl.y})}else{ds.sort((a,b)=>a.y1-b.y1);let cy=wl.y1;for(const d of ds){if(d.y1>cy+.01)S.push({x1:wl.x,y1:cy,x2:wl.x,y2:d.y1});if(d.anim<.9){const ph=(d.y2-d.y1)*(1-d.anim),pc=(d.y1+d.y2)/2;S.push({x1:wl.x,y1:pc-ph/2,x2:wl.x,y2:pc+ph/2})}cy=d.y2}if(cy<wl.y2-.01)S.push({x1:wl.x,y1:cy,x2:wl.x,y2:wl.y2})}}return S}
+function bws(){const S=[];
+  S.push({x1:-.5,y1:-.5,x2:19.5,y2:-.5,front:false,glass:true});
+  S.push({x1:-.5,y1:16.5,x2:19.5,y2:16.5,front:true,glass:true});
+  S.push({x1:-.5,y1:-.5,x2:-.5,y2:16.5,front:false,glass:true});
+  S.push({x1:19.5,y1:-.5,x2:19.5,y2:16.5,front:true,glass:true});
+  for(const wl of WD){const ds=wl.doors.map(id=>DD[id]).filter(Boolean);
+    if(wl.type==='h'){ds.sort((a,b)=>a.x1-b.x1);let cx=wl.x1;
+      for(const d of ds){if(d.x1>cx+.01)S.push({x1:cx,y1:wl.y,x2:d.x1,y2:wl.y,glass:wl.glass});if(d.anim<.9){const pw=(d.x2-d.x1)*(1-d.anim),pc=dcx(d);S.push({x1:pc-pw/2,y1:wl.y,x2:pc+pw/2,y2:wl.y,glass:wl.glass})}cx=d.x2}
+      if(cx<wl.x2-.01)S.push({x1:cx,y1:wl.y,x2:wl.x2,y2:wl.y,glass:wl.glass})
+    }else{ds.sort((a,b)=>a.y1-b.y1);let cy=wl.y1;
+      for(const d of ds){if(d.y1>cy+.01)S.push({x1:wl.x,y1:cy,x2:wl.x,y2:d.y1,glass:wl.glass});if(d.anim<.9){const ph=(d.y2-d.y1)*(1-d.anim),pc=(d.y1+d.y2)/2;S.push({x1:wl.x,y1:pc-ph/2,x2:wl.x,y2:pc+ph/2,glass:wl.glass})}cy=d.y2}
+      if(cy<wl.y2-.01)S.push({x1:wl.x,y1:cy,x2:wl.x,y2:wl.y2,glass:wl.glass})
+    }}return S}
+function tagWalls(segs){
+  for(const s of segs){
+    if(s.front!==undefined)continue;
+    const hz=Math.abs(s.y1-s.y2)<.01;
+    if(hz){s.front=!(Math.abs(s.y1-(-.5))<.01)}
+    else{s.front=!(Math.abs(s.x1-(-.5))<.01)}
+  }return segs}
+function dWS(segs){for(const s of segs){const p1=ts(s.x1,s.y1),p2=ts(s.x2,s.y2);const dx=p2.x-p1.x,dy=p2.y-p1.y,len=Math.sqrt(dx*dx+dy*dy)||1;
+  if(s.glass){
+    cx.beginPath();cx.moveTo(p1.x,p1.y+WB);cx.lineTo(p2.x,p2.y+WB);cx.lineTo(p2.x,p2.y-WH);cx.lineTo(p1.x,p1.y-WH);cx.closePath();
+    cx.fillStyle='rgba(180,220,255,0.18)';cx.fill();cx.strokeStyle='rgba(150,200,255,0.5)';cx.lineWidth=1.5;cx.stroke();
+    const tw=3;cx.beginPath();cx.moveTo(p1.x,p1.y-WH);cx.lineTo(p2.x,p2.y-WH);cx.lineTo(p2.x-dy/len*tw,p2.y-WH+dx/len*tw);cx.lineTo(p1.x-dy/len*tw,p1.y-WH+dx/len*tw);cx.closePath();cx.fillStyle='rgba(200,235,255,0.3)';cx.fill();
+    cx.strokeStyle='rgba(255,255,255,0.12)';cx.lineWidth=1;const mx2=(p1.x+p2.x)/2,my2=(p1.y+p2.y)/2-WH*0.35;cx.beginPath();cx.moveTo(mx2-dx/len*12,my2);cx.lineTo(mx2+dx/len*6,my2);cx.stroke();
+  }else{
+    cx.beginPath();cx.moveTo(p1.x,p1.y+WB);cx.lineTo(p2.x,p2.y+WB);cx.lineTo(p2.x,p2.y-WH);cx.lineTo(p1.x,p1.y-WH);cx.closePath();cx.fillStyle='#807870';cx.fill();cx.strokeStyle='rgba(0,0,0,0.1)';cx.lineWidth=1;cx.stroke();
+    const tw=3;cx.beginPath();cx.moveTo(p1.x,p1.y-WH);cx.lineTo(p2.x,p2.y-WH);cx.lineTo(p2.x-dy/len*tw,p2.y-WH+dx/len*tw);cx.lineTo(p1.x-dy/len*tw,p1.y-WH+dx/len*tw);cx.closePath();cx.fillStyle='#A09890';cx.fill();
+  }}}
 function cpSeg(px,py,x1,y1,x2,y2){const dx=x2-x1,dy=y2-y1,l2=dx*dx+dy*dy;if(l2===0)return{x:x1,y:y1};let t=((px-x1)*dx+(py-y1)*dy)/l2;t=Math.max(0,Math.min(1,t));return{x:x1+t*dx,y:y1+t*dy}}
 function rWalls(ox,oy,nx,ny){const segs=bws();for(let i=0;i<3;i++){let p=false;for(const s of segs){const cp=cpSeg(nx,ny,s.x1,s.y1,s.x2,s.y2);const dx=nx-cp.x,dy=ny-cp.y,d=Math.sqrt(dx*dx+dy*dy);if(d<PR&&d>.001){const u=(PR-d)/d;nx+=dx*u;ny+=dy*u;p=true}}if(!p)break}nx=Math.max(0.5,Math.min(MC-1.5,nx));ny=Math.max(0.5,Math.min(MR-1.5,ny));return{col:nx,row:ny}}
 
 // ==================== NPC寻路 ====================
-function cwp(fc,fr,tc,tr,trr){if(fr===trr)return[{col:tc,row:tr}];const pa=[];if(fr!=='corridor'){const d=grd(fr),cx=dcx(d),sg=isTop(fr)?-1:1;pa.push({col:cx,row:d.y+sg*.5});pa.push({col:cx,row:d.y-sg*.5})}if(trr!=='corridor'){const d=grd(trr),cx=dcx(d),sg=isTop(trr)?-1:1;pa.push({col:cx,row:d.y-sg*.5});pa.push({col:cx,row:d.y+sg*.5})}pa.push({col:tc,row:tr});return pa}
+function cwp(fc,fr,tc,tr,trr){if(fr===trr)return[{col:tc,row:tr}];const pa=[];
+  const glassRooms=['meeting','robot_lab','ai_demo'];
+  if(glassRooms.includes(fr)){const d=grd(fr),dx=dcx(d),sg=isTop(fr)?-1:1;pa.push({col:dx,row:d.y+sg*.5});pa.push({col:dx,row:d.y-sg*.5})}
+  if(glassRooms.includes(trr)){const d=grd(trr),dx=dcx(d),sg=isTop(trr)?-1:1;pa.push({col:dx,row:d.y-sg*.5});pa.push({col:dx,row:d.y+sg*.5})}
+  pa.push({col:tc,row:tr});return pa}
 
 // ==================== 画布 ====================
 const cv=document.getElementById('gameCanvas'),cx=cv.getContext('2d');
@@ -232,13 +282,28 @@ function resize(){cv.width=innerWidth;cv.height=innerHeight}addEventListener('re
 let camX=0,camY=0;
 function ts(col,row){return{x:(col-row)*(TW/2)+cv.width/2-160-camX,y:(col+row)*(TH/2)+420-camY}}
 
-// ==================== 绘制 ====================
+// ==================== 绘制基础 ====================
 function dD(x,y,w,h,f,s){cx.beginPath();cx.moveTo(x,y);cx.lineTo(x+w/2,y+h/2);cx.lineTo(x,y+h);cx.lineTo(x-w/2,y+h/2);cx.closePath();cx.fillStyle=f;cx.fill();if(s){cx.strokeStyle=s;cx.lineWidth=.5;cx.stroke()}}
 function dB(x,y,w,d,h,t,l,r){cx.beginPath();cx.moveTo(x,y-h);cx.lineTo(x+w/2,y+d/2-h);cx.lineTo(x,y+d-h);cx.lineTo(x-w/2,y+d/2-h);cx.closePath();cx.fillStyle=t;cx.fill();cx.beginPath();cx.moveTo(x-w/2,y+d/2-h);cx.lineTo(x,y+d-h);cx.lineTo(x,y+d);cx.lineTo(x-w/2,y+d/2);cx.closePath();cx.fillStyle=l;cx.fill();cx.beginPath();cx.moveTo(x+w/2,y+d/2-h);cx.lineTo(x,y+d-h);cx.lineTo(x,y+d);cx.lineTo(x+w/2,y+d/2);cx.closePath();cx.fillStyle=r;cx.fill()}
 function drawFloor(){for(let r=0;r<MR;r++)for(let c=0;c<MC;c++){const p=ts(c,r),rm=grk(r,c),cl=RC[rm],ck=(c+r)%2===0;dD(p.x,p.y,TW,TH,ck?cl.floor:cl.floorAlt,'rgba(0,0,0,0.06)')}}
-const WO=TH/4;
-function drawWalls(){const segs=bws();for(const s of segs){const a=ts(s.x1,s.y1),b=ts(s.x2,s.y2),p1={x:a.x,y:a.y+WO},p2={x:b.x,y:b.y+WO};const dx=p2.x-p1.x,dy=p2.y-p1.y,len=Math.sqrt(dx*dx+dy*dy)||1;cx.beginPath();cx.moveTo(p1.x,p1.y);cx.lineTo(p2.x,p2.y);cx.lineTo(p2.x,p2.y-WH);cx.lineTo(p1.x,p1.y-WH);cx.closePath();cx.fillStyle='#807870';cx.fill();cx.strokeStyle='rgba(0,0,0,0.1)';cx.lineWidth=1;cx.stroke();const tw=3;cx.beginPath();cx.moveTo(p1.x,p1.y-WH);cx.lineTo(p2.x,p2.y-WH);cx.lineTo(p2.x-dy/len*tw,p2.y-WH+dx/len*tw);cx.lineTo(p1.x-dy/len*tw,p1.y-WH+dx/len*tw);cx.closePath();cx.fillStyle='#A09890';cx.fill()}}
-function drawDoors(){for(const[id,d]of Object.entries(DD)){const cc=dcx(d),w=d.x2-d.x1,vw=w*(1-d.anim);const _a=ts(d.x1,d.y),_b=ts(d.x2,d.y),pf1={x:_a.x,y:_a.y+WO},pf2={x:_b.x,y:_b.y+WO};cx.strokeStyle='#555';cx.lineWidth=3;cx.beginPath();cx.moveTo(pf1.x,pf1.y);cx.lineTo(pf1.x,pf1.y-WH);cx.stroke();cx.beginPath();cx.moveTo(pf2.x,pf2.y);cx.lineTo(pf2.x,pf2.y-WH);cx.stroke();if(vw>.01){const _l=ts(cc-vw/2,d.y),_r=ts(cc+vw/2,d.y),pl={x:_l.x,y:_l.y+WO},pr={x:_r.x,y:_r.y+WO};cx.beginPath();cx.moveTo(pl.x,pl.y);cx.lineTo(pr.x,pr.y);cx.lineTo(pr.x,pr.y-WH);cx.lineTo(pl.x,pl.y-WH);cx.closePath();cx.fillStyle='#7A5030';cx.fill();cx.strokeStyle='#5A3010';cx.lineWidth=1;cx.stroke();cx.fillStyle='#FFD700';cx.beginPath();cx.arc((pl.x+pr.x)/2,(pl.y+pr.y)/2-WH/2,2.5,0,Math.PI*2);cx.fill()}cx.fillStyle=d.anim>.8?'#50FF50':'#FF8030';cx.beginPath();cx.arc((pf1.x+pf2.x)/2,(pf1.y+pf2.y)/2-WH-5,3,0,Math.PI*2);cx.fill()}}
+
+// ==================== 玻璃门绘制 ====================
+function drawDoors(){for(const[id,d]of Object.entries(DD)){const cc=dcx(d),w=d.x2-d.x1,vw=w*(1-d.anim);const pf1=ts(d.x1,d.y),pf2=ts(d.x2,d.y);
+  // door frame
+  cx.strokeStyle='#555';cx.lineWidth=3;
+  cx.beginPath();cx.moveTo(pf1.x,pf1.y+WB);cx.lineTo(pf1.x,pf1.y-WH);cx.stroke();
+  cx.beginPath();cx.moveTo(pf2.x,pf2.y+WB);cx.lineTo(pf2.x,pf2.y-WH);cx.stroke();
+  // glass door panel
+  if(vw>.01){const pl=ts(cc-vw/2,d.y),pr=ts(cc+vw/2,d.y);
+    cx.beginPath();cx.moveTo(pl.x,pl.y+WB);cx.lineTo(pr.x,pr.y+WB);cx.lineTo(pr.x,pr.y-WH);cx.lineTo(pl.x,pl.y-WH);cx.closePath();
+    cx.fillStyle='rgba(180,220,255,0.25)';cx.fill();
+    cx.strokeStyle='rgba(150,200,255,0.6)';cx.lineWidth=1.5;cx.stroke();
+    cx.fillStyle='rgba(255,255,255,0.15)';cx.fillRect(pl.x+(pr.x-pl.x)*0.1,pl.y-WH+2,(pr.x-pl.x)*0.15,WH*0.7);
+    const hp=ts(cc,d.y);cx.fillStyle='#A0A0A0';cx.beginPath();cx.arc(hp.x,hp.y-WH/2,2.5,0,Math.PI*2);cx.fill();cx.fillStyle='#C0C0C0';cx.beginPath();cx.arc(hp.x-.5,hp.y-WH/2-.5,1.2,0,Math.PI*2);cx.fill()
+  }
+  const ip=ts(cc,d.y);cx.fillStyle=d.anim>.8?'#50FF50':'#FF8030';cx.beginPath();cx.arc(ip.x,ip.y-WH-5,3,0,Math.PI*2);cx.fill();
+  cx.fillStyle='rgba(255,255,255,0.6)';cx.font='bold 10px "PingFang SC"';cx.textAlign='center';cx.fillText(d.label,ip.x,ip.y-WH-12);
+}}
 
 // ==================== 家具绘制 ====================
 function dFI(it){const p=ts(it.col,it.row);switch(it.type){
@@ -246,7 +311,6 @@ function dFI(it){const p=ts(it.col,it.row);switch(it.type){
   case'meeting_table':{for(let dr=0;dr<it.h;dr++)for(let dc=0;dc<it.w;dc++){const pp=ts(it.col+dc,it.row+dr);dB(pp.x,pp.y,TW,TH,12,'#C09060','#906838','#A87848')}break}
   case'chair':{dB(p.x,p.y,TW*.45,TH*.45,7,'#606068','#404048','#505058');break}
   case'tv_cabinet':{const m=ts(it.col,it.row);dB(m.x,m.y,TW*.85,TH*.85,12,'#8B6914','#6B4914','#7B5914');cx.fillStyle='#1A1A2E';cx.fillRect(m.x-22,m.y-24,44,24);cx.fillStyle='#3366BB';cx.fillRect(m.x-20,m.y-22,40,20);cx.fillStyle='rgba(100,180,255,0.3)';cx.fillRect(m.x-18,m.y-20,16,8);cx.fillRect(m.x+2,m.y-20,16,8);cx.fillStyle='rgba(255,200,100,0.3)';cx.fillRect(m.x-18,m.y-11,36,6);break}
-  case'beanbag':{const c=it.clr||'#66AA66',cd=it.clrd||'#448844';cx.fillStyle=cd;cx.beginPath();cx.ellipse(p.x,p.y-2,TW*.38,TH*.42,0,0,Math.PI*2);cx.fill();cx.fillStyle=c;cx.beginPath();cx.ellipse(p.x,p.y-5,TW*.32,TH*.3,0,Math.PI,Math.PI*2);cx.fill();cx.beginPath();cx.ellipse(p.x,p.y-3,TW*.34,TH*.28,0,0,Math.PI);cx.fill();break}
   case'workbench':{for(let dc=0;dc<it.w;dc++){const pp=ts(it.col+dc,it.row);dB(pp.x,pp.y,TW,TH,16,'#909090','#686868','#808080')}const b=ts(it.col+Math.floor(it.w/2),it.row);cx.fillStyle='#F44';cx.fillRect(b.x-8,b.y-18,6,4);cx.fillStyle='#4F4';cx.fillRect(b.x+2,b.y-18,6,4);cx.fillStyle='#44F';cx.fillRect(b.x-8,b.y-12,6,4);break}
   case'tool_shelf':{for(let dr=0;dr<it.h;dr++){const pp=ts(it.col,it.row+dr);dB(pp.x,pp.y,TW*.8,TH*.8,28,'#A08060','#806040','#907050');cx.fillStyle='#FFD700';cx.fillRect(pp.x-8,pp.y-22,4,6);cx.fillStyle='#C0C0C0';cx.fillRect(pp.x-2,pp.y-22,4,6)}break}
   case'robot_display':{dB(p.x,p.y,TW*.7,TH*.7,6,'#E0E0E0','#C0C0C0','#D0D0D0');cx.fillStyle='#4A90D9';cx.fillRect(p.x-6,p.y-20,12,10);cx.fillStyle='#88CCFF';cx.beginPath();cx.arc(p.x-3,p.y-16,2,0,Math.PI*2);cx.fill();cx.beginPath();cx.arc(p.x+3,p.y-16,2,0,Math.PI*2);cx.fill();cx.fillStyle='#888';cx.fillRect(p.x-1,p.y-26,2,6);cx.fillStyle='#F44';cx.beginPath();cx.arc(p.x,p.y-27,2,0,Math.PI*2);cx.fill();break}
@@ -260,10 +324,20 @@ function dFI(it){const p=ts(it.col,it.row);switch(it.type){
   case'drum_kit':{cx.fillStyle='#8B0000';cx.beginPath();cx.ellipse(p.x,p.y-3,10,5,0,0,Math.PI*2);cx.fill();cx.fillStyle='#A52A2A';cx.beginPath();cx.ellipse(p.x-7,p.y-7,4,2.5,0,0,Math.PI*2);cx.fill();cx.beginPath();cx.ellipse(p.x+7,p.y-7,4,2.5,0,0,Math.PI*2);cx.fill();cx.fillStyle='#FFD700';cx.beginPath();cx.ellipse(p.x-5,p.y-13,7,2.5,-.2,0,Math.PI*2);cx.fill();cx.beginPath();cx.ellipse(p.x+9,p.y-13,4,1.5,.2,0,Math.PI*2);cx.fill();cx.fillStyle='#888';cx.fillRect(p.x-5,p.y-11,1,5);cx.fillRect(p.x+8,p.y-11,1,4);cx.fillStyle='#C0C0C0';cx.fillRect(p.x-1,p.y-5,2,3);break}
   case'guitar':{cx.fillStyle='#8B4513';cx.beginPath();cx.ellipse(p.x+2,p.y-1,7,4,.3,0,Math.PI*2);cx.fill();cx.fillStyle='#A0522D';cx.beginPath();cx.ellipse(p.x+2,p.y-6,5,3,.3,0,Math.PI*2);cx.fill();cx.fillStyle='#654321';cx.fillRect(p.x-1,p.y-16,3,12);cx.fillStyle='#333';cx.fillRect(p.x-2,p.y-19,5,4);cx.fillStyle='#DDD';cx.fillRect(p.x,p.y-16,1,11);cx.fillRect(p.x+1,p.y-16,1,11);cx.fillStyle='#444';cx.fillRect(p.x-1,p.y-5,5,1.5);break}
   case'keyboard':{dB(p.x,p.y,TW*.9,TH*.9,5,'#333','#222','#2A2A2A');for(let i=0;i<8;i++){cx.fillStyle='#FFF';cx.fillRect(p.x-15+i*4,p.y-4,3,3)}for(let i of[0,1,3,4,5]){cx.fillStyle='#111';cx.fillRect(p.x-14+i*4,p.y-5,2.5,2)}cx.fillStyle='#555';cx.fillRect(p.x-13,p.y+1,1,3);cx.fillRect(p.x+12,p.y+1,1,3);break}
+  case'whiteboard':{dB(p.x,p.y,TW*.8,TH*.8,3,'#FFF','#EEE','#F5F5F5');cx.fillStyle='#FFF';cx.fillRect(p.x-14,p.y-32,28,20);cx.strokeStyle='#888';cx.lineWidth=1;cx.strokeRect(p.x-14,p.y-32,28,20);cx.fillStyle='#4A90D9';cx.font='7px Arial';cx.textAlign='center';cx.fillText('AI教育',p.x,p.y-23);cx.fillStyle='#E88';cx.fillRect(p.x-10,p.y-18,8,1.5);cx.fillStyle='#4A4';cx.fillRect(p.x-1,p.y-18,12,1.5);cx.fillStyle='#44F';cx.fillRect(p.x-10,p.y-15,6,1.5);break}
+  case'robot_v1':{dB(p.x,p.y,TW*.55,TH*.55,4,'#C0C0C0','#909090','#A0A0A0');cx.fillStyle='#A0A0A0';cx.fillRect(p.x-7,p.y-22,14,13);cx.fillStyle='#808080';cx.fillRect(p.x-9,p.y-22,3,13);cx.fillRect(p.x+6,p.y-22,3,13);cx.fillStyle='#FF6600';cx.fillRect(p.x-4,p.y-18,3,3);cx.fillRect(p.x+1,p.y-18,3,3);cx.fillStyle='#555';cx.fillRect(p.x-3,p.y-9,6,2);cx.fillStyle='#F00';cx.beginPath();cx.arc(p.x,p.y-25,2,0,Math.PI*2);cx.fill();cx.fillStyle='#FFF';cx.font='bold 5px Arial';cx.textAlign='center';cx.fillText('V1',p.x,p.y-15);break}
+  case'robot_v2':{dB(p.x,p.y,TW*.55,TH*.55,4,'#E0E8F0','#B0C0D0','#C8D8E8');cx.fillStyle='#4A90D9';cx.fillRect(p.x-7,p.y-25,14,16);cx.fillStyle='#3068B0';cx.beginPath();cx.moveTo(p.x-7,p.y-25);cx.lineTo(p.x-10,p.y-22);cx.lineTo(p.x-10,p.y-12);cx.lineTo(p.x-7,p.y-9);cx.closePath();cx.fill();cx.beginPath();cx.moveTo(p.x+7,p.y-25);cx.lineTo(p.x+10,p.y-22);cx.lineTo(p.x+10,p.y-12);cx.lineTo(p.x+7,p.y-9);cx.closePath();cx.fill();cx.fillStyle='#1A1A2E';cx.fillRect(p.x-5,p.y-21,10,6);cx.fillStyle='#88CCFF';cx.fillRect(p.x-4,p.y-20,3,4);cx.fillRect(p.x+1,p.y-20,3,4);cx.fillStyle='#4F4';cx.beginPath();cx.arc(p.x,p.y-28,2,0,Math.PI*2);cx.fill();cx.fillStyle='#FFF';cx.font='bold 5px Arial';cx.textAlign='center';cx.fillText('V2',p.x,p.y-14);break}
+  case'robot_arm':{dB(p.x,p.y,TW*.65,TH*.65,8,'#606060','#404040','#505050');cx.fillStyle='#888';cx.fillRect(p.x-2,p.y-22,4,18);cx.fillStyle='#AAA';cx.fillRect(p.x,p.y-22,12,3);cx.fillRect(p.x+10,p.y-22,3,10);cx.fillStyle='#F80';cx.beginPath();cx.arc(p.x+11,p.y-13,2,0,Math.PI*2);cx.fill();cx.fillStyle='#FF0';cx.beginPath();cx.arc(p.x+11,p.y-13,1,0,Math.PI*2);cx.fill();break}
+  case'oscilloscope':{dB(p.x,p.y,TW*.55,TH*.55,10,'#505050','#303030','#404040');cx.fillStyle='#222';cx.fillRect(p.x-10,p.y-20,20,13);cx.fillStyle='#080';cx.fillRect(p.x-8,p.y-18,16,9);cx.strokeStyle='#0F0';cx.lineWidth=1;cx.beginPath();cx.moveTo(p.x-6,p.y-14);cx.lineTo(p.x-3,p.y-16);cx.lineTo(p.x,p.y-12);cx.lineTo(p.x+3,p.y-15);cx.lineTo(p.x+6,p.y-13);cx.stroke();cx.fillStyle='#F44';cx.beginPath();cx.arc(p.x+8,p.y-10,1.5,0,Math.PI*2);cx.fill();break}
+  case'ps5':{dB(p.x,p.y,TW*.8,TH*.8,6,'#333','#222','#2A2A2A');cx.fillStyle='#1A1A2E';cx.fillRect(p.x-18,p.y-24,36,18);cx.fillStyle='#003087';cx.fillRect(p.x-16,p.y-22,32,14);cx.fillStyle='#DDD';cx.font='bold 8px Arial';cx.textAlign='center';cx.fillText('PS5',p.x,p.y-13);cx.fillStyle='#FFF';cx.fillRect(p.x+16,p.y-18,5,14);cx.fillStyle='#000';cx.fillRect(p.x+17,p.y-16,3,2);break}
+  case'switch_console':{dB(p.x,p.y,TW*.8,TH*.8,6,'#333','#222','#2A2A2A');cx.fillStyle='#1A1A2E';cx.fillRect(p.x-18,p.y-24,36,18);cx.fillStyle='#E60012';cx.fillRect(p.x-16,p.y-22,32,14);cx.fillStyle='#FFF';cx.font='bold 6px Arial';cx.textAlign='center';cx.fillText('SWITCH',p.x,p.y-13);cx.fillStyle='#0FF';cx.fillRect(p.x-18,p.y-24,4,18);cx.fillStyle='#F0F';cx.fillRect(p.x+14,p.y-24,4,18);break}
+  case'projector':{dB(p.x,p.y,TW*.45,TH*.45,8,'#404040','#282828','#343434');cx.fillStyle='#555';cx.fillRect(p.x-6,p.y-14,12,8);cx.fillStyle='#88F';cx.beginPath();cx.arc(p.x-3,p.y-10,3,0,Math.PI*2);cx.fill();cx.fillStyle='#FFF';cx.beginPath();cx.arc(p.x-3,p.y-10,1.5,0,Math.PI*2);cx.fill();break}
+  case'projection_screen':{cx.fillStyle='#444';cx.fillRect(p.x-2,p.y-44,4,44);cx.fillStyle='#FFF';cx.fillRect(p.x-26,p.y-42,52,34);cx.strokeStyle='#888';cx.lineWidth=1.5;cx.strokeRect(p.x-26,p.y-42,52,34);cx.fillStyle='rgba(100,150,255,0.1)';cx.fillRect(p.x-24,p.y-40,48,30);cx.strokeStyle='#555';cx.lineWidth=1;cx.beginPath();cx.moveTo(p.x-20,p.y-30);cx.lineTo(p.x-10,p.y-35);cx.lineTo(p.x+5,p.y-28);cx.lineTo(p.x+15,p.y-33);cx.lineTo(p.x+20,p.y-26);cx.stroke();break}
+  case'disco_ball':{cx.fillStyle='#888';cx.fillRect(p.x-1,p.y-44,2,22);cx.fillStyle='#DDD';cx.beginPath();cx.arc(p.x,p.y-46,9,0,Math.PI*2);cx.fill();cx.strokeStyle='rgba(255,255,255,0.4)';cx.lineWidth=.5;for(let a=0;a<6;a++){const ag=a*Math.PI/3;cx.beginPath();cx.moveTo(p.x,p.y-46);cx.lineTo(p.x+Math.cos(ag)*9,p.y-46+Math.sin(ag)*9);cx.stroke()}cx.fillStyle='rgba(255,50,50,0.2)';cx.beginPath();cx.moveTo(p.x,p.y-46);cx.lineTo(p.x-22,p.y-8);cx.lineTo(p.x-16,p.y-8);cx.closePath();cx.fill();cx.fillStyle='rgba(50,255,50,0.2)';cx.beginPath();cx.moveTo(p.x,p.y-46);cx.lineTo(p.x+18,p.y-4);cx.lineTo(p.x+24,p.y-4);cx.closePath();cx.fill();cx.fillStyle='rgba(50,50,255,0.2)';cx.beginPath();cx.moveTo(p.x,p.y-46);cx.lineTo(p.x-6,p.y+2);cx.lineTo(p.x+6,p.y+2);cx.closePath();cx.fill();break}
 }}
-function drawLabels(){const ls=[{c:2,r:1,t:'会议室'},{c:10,r:2,t:'办公区'},{c:17,r:2,t:'机器人研发室'},{c:10,r:10.5,t:'走廊'},{c:2,r:13,t:'娱乐室'},{c:10,r:13,t:'餐厅'},{c:17,r:13,t:'储藏室'}];cx.font='bold 11px "PingFang SC"';cx.textAlign='center';ls.forEach(l=>{const p=ts(l.c,l.r);cx.fillStyle='rgba(0,0,0,0.3)';cx.fillText(l.t,p.x,p.y+TH/2+4)})}
+function drawLabels(){const ls=[{c:2,r:1,t:'会议室'},{c:8,r:2,t:'办公区'},{c:15.5,r:2,t:'机器人研发室'},{c:10,r:10.5,t:'走廊'},{c:4,r:13,t:'娱乐室'},{c:12,r:13,t:'餐厅'},{c:17,r:13,t:'储藏室'}];cx.font='bold 11px "PingFang SC"';cx.textAlign='center';ls.forEach(l=>{const p=ts(l.c,l.r);cx.fillStyle='rgba(0,0,0,0.3)';cx.fillText(l.t,p.x,p.y+TH/2+4)})}
 
-// ==================== 机器人 ====================
+// ==================== 机器人绘制 (2x) ====================
 function dR(x,y,cl,dir,name,isP){const bw=22,bh=18,hw=16,hh=10;cx.fillStyle='rgba(0,0,0,0.15)';cx.beginPath();cx.ellipse(x,y+2,16,6,0,0,Math.PI*2);cx.fill();cx.fillStyle='#333';cx.beginPath();cx.ellipse(x-10,y,5,3,-.3,0,Math.PI*2);cx.fill();cx.beginPath();cx.ellipse(x+10,y,5,3,-.3,0,Math.PI*2);cx.fill();cx.fillStyle='#222';cx.beginPath();cx.ellipse(x-10,y,5,3,-.3,Math.PI,Math.PI*2);cx.fill();cx.beginPath();cx.ellipse(x+10,y,5,3,-.3,Math.PI,Math.PI*2);cx.fill();const by=y-12;cx.fillStyle=cl.body;cx.fillRect(x-bw/2,by-bh,bw,bh);cx.fillStyle=cl.dark;cx.beginPath();cx.moveTo(x-bw/2,by);cx.lineTo(x-bw/2-5,by-3);cx.lineTo(x-bw/2-5,by-bh-3);cx.lineTo(x-bw/2,by-bh);cx.closePath();cx.fill();cx.beginPath();cx.moveTo(x+bw/2,by);cx.lineTo(x+bw/2+5,by-3);cx.lineTo(x+bw/2+5,by-bh-3);cx.lineTo(x+bw/2,by-bh);cx.closePath();cx.fill();cx.fillStyle=cl.light;cx.beginPath();cx.moveTo(x-bw/2,by-bh);cx.lineTo(x+bw/2,by-bh);cx.lineTo(x+bw/2+5,by-bh-3);cx.lineTo(x-bw/2-5,by-bh-3);cx.closePath();cx.fill();cx.fillStyle='#FFF';cx.font='bold 7px Arial';cx.textAlign='center';cx.textBaseline='middle';const ly=by-bh/2-2;cx.fillText('LW',x,ly);cx.strokeStyle='#FFF';cx.lineWidth=1;cx.beginPath();cx.arc(x,ly,6,0,Math.PI*2);cx.stroke();const hby=by-bh-7;cx.fillStyle='#888';cx.fillRect(x-3,hby+hh,6,5);cx.fillStyle='#D8D8D8';cx.fillRect(x-hw/2,hby-hh+4,hw,hh);cx.fillStyle='#E8E8E8';cx.fillRect(x-hw/2-2,hby-hh+2,hw+4,3);const ey=hby-hh/2+4;[[x-5],[x+5]].forEach(([ex])=>{cx.fillStyle='#444';cx.beginPath();cx.arc(ex,ey,4,0,Math.PI*2);cx.fill();cx.fillStyle='#88CCFF';cx.beginPath();cx.arc(ex,ey,2.5,0,Math.PI*2);cx.fill();cx.fillStyle='#222';cx.beginPath();cx.arc(ex,ey,1.2,0,Math.PI*2);cx.fill()});cx.fillStyle=cl.dark;cx.fillRect(x-bw/2-8,by-bh+3,5,10);cx.fillRect(x+bw/2+3,by-bh+3,5,10);cx.fillStyle='#888';cx.beginPath();cx.arc(x-bw/2-5.5,by-bh+15,3,0,Math.PI*2);cx.fill();cx.beginPath();cx.arc(x+bw/2+5.5,by-bh+15,3,0,Math.PI*2);cx.fill();if(name){cx.font='bold 10px "PingFang SC"';cx.textAlign='center';if(isP){cx.fillStyle='#FFD700';cx.fillText(name,x,hby-hh-4)}else{cx.fillStyle='#FFF';cx.fillText(name,x,hby-hh-4)}}}
 
 // ==================== 角色 ====================
@@ -271,13 +345,13 @@ class Ch{
   constructor(col,row,cl,name,isP){this.col=col;this.row=row;this.cl=cl;this.name=name;this.isP=isP;this.tc=col;this.tr=row;this.mv=false}
   get sp(){return ts(this.col,this.row)}
   get depth(){return this.col+this.row}
-  update(dt){if(this.mv){const dc=this.tc-this.col,dr=this.tr-this.row,d=Math.sqrt(dc*dc+dr*dr);if(d<.05){this.col=this.tc;this.row=this.tr;this.mv=false}else{const s=Math.min((this.isP?SPD:SPD*.4)*dt,d);let nx=this.col+(dc/d)*s,ny=this.row+(dr/d)*s;if(!this.isP){const w=rWalls(this.col,this.row,nx,ny);nx=w.col;ny=w.row;if(canWalk(nx,ny)){this.col=nx;this.row=ny}}else{this.col=nx;this.row=ny}}}}
+  update(dt){if(this.mv){const dc=this.tc-this.col,dr=this.tr-this.row,d=Math.sqrt(dc*dc+dr*dr);if(d<.05){this.col=this.tc;this.row=this.tr;this.mv=false}else{const s=Math.min((this.isP?SPD:SPD*.4)*dt,d);let nx=this.col+(dc/d)*s,ny=this.row+(dr/d)*s;const w=rWalls(this.col,this.row,nx,ny);nx=w.col;ny=w.row;if(canWalk(nx,ny)){this.col=nx;this.row=ny}else if(canWalk(nx,this.row)){this.col=nx}else if(canWalk(this.col,ny)){this.row=ny}else{this.mv=false}}}}
   draw(){const p=this.sp;dR(p.x,p.y,this.cl,0,this.name,this.isP)}
   dist(o){return Math.sqrt((this.col-o.col)**2+(this.row-o.row)**2)}
 }
 
 // ==================== NPC ====================
-const NDEST={working:[{col:6,row:3},{col:9,row:3},{col:12,row:3},{col:7,row:7},{col:11,row:7}],testing:[{col:1,row:13},{col:2,row:13},{col:3,row:13}],lab_work:[{col:16.5,row:3},{col:17,row:5},{col:17,row:7}],kitchen:[{col:11,row:13},{col:8,row:14},{col:13,row:15}],course_dev:[{col:17,row:12},{col:18,row:12},{col:16,row:15}],meeting_state:[{col:0,row:4},{col:4,row:4},{col:2,row:7}],idle:[{col:10,row:10.5},{col:3,row:10.5},{col:17,row:11}]};
+const NDEST={working:[{col:6,row:3},{col:8,row:3},{col:10,row:3},{col:7,row:7},{col:10,row:7}],testing:[{col:2,row:13},{col:4,row:13},{col:6,row:13}],lab_work:[{col:14,row:3},{col:15,row:5},{col:17,row:7}],kitchen:[{col:10,row:14},{col:12,row:14},{col:14,row:15}],course_dev:[{col:17,row:12},{col:18,row:12},{col:16,row:15}],meeting_state:[{col:0,row:4},{col:4,row:4},{col:2,row:7}],idle:[{col:10,row:10.5},{col:3,row:10.5},{col:15,row:11}]};
 function npcClr(name){const d=ND.find(n=>n.name===name);return d?d.body:'#FFF'}
 function pickR(name,topic){const p=NPC_P[name];if(!p)return'...';const rs=p.r[topic]||p.r.general;return rs[Math.floor(Math.random()*rs.length)]}
 function roomTopic(rm){return{office:'work',meeting:'meeting',kitchen:'food',ai_demo:'agent',robot_lab:'robot',course_dev:'course',corridor:'general'}[rm]||'general'}
@@ -290,117 +364,453 @@ class NPC extends Ch{
 
 // ==================== 社交信息流 ====================
 const feedBody=document.getElementById('feedBody');
+let feedData=[];
+try{feedData=JSON.parse(localStorage.getItem('lw_feed')||'[]')}catch(e){feedData=[]}
+function saveFeed(){try{localStorage.setItem('lw_feed',JSON.stringify(feedData))}catch(e){}}
 function fmtT(){const d=new Date();return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')}
-function addFeed(type,html){
-  const d=document.createElement('div');d.className='fm '+type;
-  d.innerHTML='<span class="ts">'+fmtT()+'</span>'+html;
-  feedBody.appendChild(d);
-  while(feedBody.children.length>80)feedBody.removeChild(feedBody.firstChild);
-  feedBody.scrollTop=feedBody.scrollHeight;
-}
+function addFeed(type,html,noSave){const d=document.createElement('div');d.className='fm '+type;const ts=fmtT();d.innerHTML='<span class="ts">'+ts+'</span>'+html;feedBody.appendChild(d);while(feedBody.children.length>80)feedBody.removeChild(feedBody.firstChild);feedBody.scrollTop=feedBody.scrollHeight;if(!noSave){feedData.push({type,html,ts});while(feedData.length>80)feedData.shift();saveFeed()}}
+function loadSavedFeed(){feedData.forEach(m=>{const d=document.createElement('div');d.className='fm '+m.type;d.innerHTML='<span class="ts">'+m.ts+'</span>'+m.html;feedBody.appendChild(d)});feedBody.scrollTop=feedBody.scrollHeight}
 function feedChat(n1,txt){addFeed('chat','<span class="sp" style="color:'+npcClr(n1)+'">'+n1+'</span>：'+txt)}
 
 // ==================== NPC间对话 ====================
 let npcChatCD=15;
-function tryNPCChat(dt){
-  if(GEVT.active)return;
-  npcChatCD-=dt;if(npcChatCD>0)return;
-  npcChatCD=20+Math.random()*25;
-  let best=null,bd=99;
-  for(let i=0;i<npcs.length;i++)for(let j=i+1;j<npcs.length;j++){
-    const ri=gra(npcs[i].col,npcs[i].row),rj=gra(npcs[j].col,npcs[j].row);
-    if(ri===rj&&ri!=='corridor'){const d=npcs[i].dist(npcs[j]);if(d<bd){bd=d;best=[npcs[i],npcs[j]]}}}
-  if(!best||bd>6)return;
-  const n1=best[0],n2=best[1],rm=gra(n1.col,n1.row),tp=roomTopic(rm);
-  feedChat(n1.name,pickR(n1.name,tp));
-  setTimeout(()=>{feedChat(n2.name,pickR(n2.name,tp))},2500+Math.random()*1500);
-  if(Math.random()>.45)setTimeout(()=>{feedChat(n1.name,pickR(n1.name,'general'))},5500+Math.random()*1500);
-}
+function tryNPCChat(dt){if(GEVT.active)return;npcChatCD-=dt;if(npcChatCD>0)return;npcChatCD=20+Math.random()*25;let best=null,bd=99;for(let i=0;i<npcs.length;i++)for(let j=i+1;j<npcs.length;j++){const ri=gra(npcs[i].col,npcs[i].row),rj=gra(npcs[j].col,npcs[j].row);if(ri===rj&&ri!=='corridor'){const d=npcs[i].dist(npcs[j]);if(d<bd){bd=d;best=[npcs[i],npcs[j]]}}}if(!best||bd>6)return;const n1=best[0],n2=best[1],rm=gra(n1.col,n1.row),tp=roomTopic(rm);feedChat(n1.name,pickR(n1.name,tp));setTimeout(()=>{feedChat(n2.name,pickR(n2.name,tp))},2500+Math.random()*1500);if(Math.random()>.45)setTimeout(()=>{feedChat(n1.name,pickR(n1.name,'general'))},5500+Math.random()*1500)}
 
 // ==================== 玩家自动巡航 ====================
 const ap={active:false,lastInput:0,state:'idle',wps:[],wi:0,st:0,nat:15};
 const AP_LABELS={idle:'在走廊溜达',working:'去办公区工作',testing:'去娱乐室玩音乐',lab_work:'去机器人实验室看看',kitchen:'去餐厅找吃的',course_dev:'去储藏室看看',meeting_state:'去会议室坐坐'};
-function activateAP(){
-  ap.active=true;ap.state='idle';ap.st=0;
-  addFeed('autopilot','Alex顾问 暂时离开了，开始自由活动...');
-  chooseAPTgt();
-}
-function chooseAPTgt(){
-  const sts=['idle','working','testing','lab_work','kitchen','course_dev','meeting_state'];
-  const ws=[15,20,15,15,10,10,15],tot=ws.reduce((a,b)=>a+b,0);
-  let r=Math.random()*tot,ch='idle';for(let i=0;i<sts.length;i++){r-=ws[i];if(r<=0){ch=sts[i];break}}
-  ap.state=ch;ap.st=0;ap.nat=15+Math.random()*20;
-  const ds=NDEST[ch]||NDEST.idle,tgt=ds[Math.floor(Math.random()*ds.length)];
-  const fr=gra(player.col,player.row),trr=gra(tgt.col,tgt.row);
-  ap.wps=cwp(player.col,fr,tgt.col,tgt.row,trr);ap.wi=0;
-  addFeed('autopilot','Alex顾问 正在'+AP_LABELS[ch]+'...');
-}
-function updateAP(dt){
-  if(!player.mv&&ap.wi<ap.wps.length){const w=ap.wps[ap.wi];player.tc=w.col;player.tr=w.row;player.mv=true;ap.wi++}
-  if(!player.mv&&ap.wi>=ap.wps.length){ap.st+=dt;if(ap.st>ap.nat)chooseAPTgt()}
-  for(const[id,d]of Object.entries(DD)){const cc=dcx(d);if(Math.sqrt((player.col-cc)**2+(player.row-d.y)**2)<2&&!d.open)d.open=true}
-}
+function activateAP(){ap.active=true;ap.state='idle';ap.st=0;addFeed('autopilot','Alex CEO 暂时离开了，开始自由活动...');chooseAPTgt()}
+function chooseAPTgt(){const sts=['idle','working','testing','lab_work','kitchen','course_dev','meeting_state'];const ws=[15,20,15,15,10,10,15],tot=ws.reduce((a,b)=>a+b,0);let r=Math.random()*tot,ch='idle';for(let i=0;i<sts.length;i++){r-=ws[i];if(r<=0){ch=sts[i];break}}ap.state=ch;ap.st=0;ap.nat=15+Math.random()*20;const ds=NDEST[ch]||NDEST.idle,tgt=ds[Math.floor(Math.random()*ds.length)];const fr=gra(player.col,player.row),trr=gra(tgt.col,tgt.row);ap.wps=cwp(player.col,fr,tgt.col,tgt.row,trr);ap.wi=0;addFeed('autopilot','Alex CEO 正在'+AP_LABELS[ch]+'...')}
+function updateAP(dt){if(!player.mv&&ap.wi<ap.wps.length){const w=ap.wps[ap.wi];player.tc=w.col;player.tr=w.row;player.mv=true;ap.wi++}if(!player.mv&&ap.wi>=ap.wps.length){ap.st+=dt;if(ap.st>ap.nat)chooseAPTgt()}for(const[id,d]of Object.entries(DD)){const cc=dcx(d);if(Math.sqrt((player.col-cc)**2+(player.row-d.y)**2)<2&&!d.open)d.open=true}}
 
 // ==================== 随机事件 ====================
 const EVENTS=[
-  {label:'产品评审会',room:'meeting',dests:[{col:0,row:4},{col:2,row:4},{col:4,row:4},{col:1,row:7},{col:3,row:7}],dur:45,
-   announce:'产品评审会即将开始！全员到会议室集合！',
-   dlg:['这个季度的AI课程完课率达到了85%，数据很好！','教育机器人V3的反馈很正面，孩子们特别喜欢','智能体平台的月活涨了40%，趋势不错','下个版本要重点优化课堂互动功能','青少年用户调研显示，图形化编程是最受欢迎的功能','我们要继续深耕AI教育赛道，保持领先','Alex顾问帮我们分析下最新的客户需求反馈']},
-  {label:'机器人联调测试',room:'robot_lab',dests:[{col:16,row:3},{col:17,row:5},{col:18,row:5},{col:17,row:7},{col:18,row:7}],dur:40,
-   announce:'机器人联调测试开始！研发团队到机器人研发室！',
-   dlg:['传感器响应时间优化到50ms了！','舵机动作流畅度提升明显，青少年学生的操作体验更好了','固件更新后稳定性提高了很多','3D打印的新外壳效果不错，重量也减轻了','语音识别准确率95%，基本达到目标','下一步要优化电池续航方案','有个14岁学员提的需求太专业了，我们的产品要跟上']},
-  {label:'课程方案研讨',room:'office',dests:[{col:6,row:3},{col:9,row:3},{col:12,row:3},{col:7,row:7},{col:11,row:7}],dur:45,
-   announce:'课程方案研讨时间！在办公区讨论新课内容！',
-   dlg:['新课件的交互设计需要重新打磨','10-16岁学员的注意力集中时间有限，课程节奏要快','编程挑战赛的题目设计要更有趣','有学员反馈说希望增加AI绘画相关的课程','课程完课率数据显示，互动环节多的课更受欢迎','下个季度的课程排期需要确认','AI创意编程课的素材库需要更新']},
-  {label:'音乐团建',room:'ai_demo',dests:[{col:1,row:13},{col:2,row:13},{col:3,row:13},{col:2,row:14},{col:2,row:15}],dur:35,
-   announce:'音乐团建时间！去娱乐室玩音乐！',
-   dlg:['架子鼓太上头了！我来打节奏！','电吉他solo时间！','键盘弹一首大家都会的歌吧！','虽然不太专业，但是很开心！','音乐也是创造力的一部分！','休息好了工作效率更高','这个乐队配合得还不错嘛！']},
-  {label:'团队下午茶',room:'kitchen',dests:[{col:8,row:14},{col:9,row:14},{col:11,row:15},{col:13,row:15}],dur:35,
-   announce:'下午茶时间！大家休息一下，来厨房集合！',
-   dlg:['咖啡续命！写了一下午代码','来一块蛋糕，犒劳辛苦的自己','AI教育改变世界，先从吃好开始！','下周有教育科技展会，先养好精神','最近产品节奏确实快，该放松一下了','边吃边聊，我有个新的课程idea','团队氛围真好，大家一起努力的感觉很棒']}
+  {label:'产品评审会',room:'meeting',dests:[{col:0,row:4},{col:2,row:4},{col:4,row:4},{col:1,row:7},{col:3,row:7}],dur:45,announce:'产品评审会即将开始！全员到会议室集合！',dlg:['这个季度的PBL项目完成率达到了85%，孩子们分享和创造的热情很高！','AI伙伴机器人V3的反馈很正面，孩子说伙伴像是真正的朋友','伙伴培育平台的月活涨了40%，孩子在上面花的时间越来越多','下个版本要重点优化AI伙伴的成长系统','用户调研显示，分享和探索功能是最受孩子欢迎的','我们要继续深耕AI生命培育赛道，让孩子都成为AI时代原住民','Alex CEO帮我们分析下最新的AI伙伴培育数据']},
+  {label:'机器人联调测试',room:'robot_lab',dests:[{col:14,row:3},{col:16,row:5},{col:18,row:5},{col:15,row:7},{col:17,row:7}],dur:40,announce:'机器人联调测试开始！研发团队到机器人研发室！',dlg:['传感器响应时间优化到50ms了！','舵机动作流畅度提升明显，青少年学生的操作体验更好了','固件更新后稳定性提高了很多','3D打印的新外壳效果不错，重量也减轻了','语音识别准确率95%，基本达到目标','下一步要优化电池续航方案','有个14岁学员提的需求太专业了，我们的产品要跟上']},
+  {label:'课程方案研讨',room:'office',dests:[{col:6,row:3},{col:8,row:3},{col:10,row:3},{col:7,row:7},{col:10,row:7}],dur:45,announce:'课程方案研讨时间！在办公区讨论新课内容！',dlg:['新课件的交互设计需要重新打磨','10-16岁学员的注意力集中时间有限，课程节奏要快','编程挑战赛的题目设计要更有趣','有学员反馈说希望增加AI绘画相关的课程','课程完课率数据显示，互动环节多的课更受欢迎','下个季度的课程排期需要确认','AI创意编程课的素材库需要更新']},
+  {label:'音乐团建',room:'ai_demo',dests:[{col:2,row:13},{col:4,row:13},{col:6,row:13},{col:3,row:14},{col:5,row:15}],dur:35,announce:'音乐团建时间！去娱乐室玩音乐！',dlg:['架子鼓太上头了！我来打节奏！','电吉他solo时间！','键盘弹一首大家都会的歌吧！','虽然不太专业，但是很开心！','音乐也是创造力的一部分！','休息好了工作效率更高','这个乐队配合得还不错嘛！']},
+  {label:'团队下午茶',room:'kitchen',dests:[{col:10,row:14},{col:12,row:14},{col:12,row:15},{col:14,row:15}],dur:35,announce:'下午茶时间！大家休息一下，来厨房集合！',dlg:['咖啡续命！写了一下午代码','来一块蛋糕，犒劳辛苦的自己','AI教育改变世界，先从吃好开始！','下周有教育科技展会，先养好精神','最近产品节奏确实快，该放松一下了','边吃边聊，我有个新的课程idea','团队氛围真好，大家一起努力的感觉很棒']}
 ];
 const GEVT={active:null,cd:30,dlgCD:0};
-function triggerEvt(){
-  const ev=EVENTS[Math.floor(Math.random()*EVENTS.length)];
-  GEVT.active={ev,timer:0,dlgCD:0};
-  addFeed('event','<b>'+ev.label+'</b> — '+ev.announce);
-  npcs.forEach((n,i)=>{
-    n.inEvt=true;n.wps=[];n.wi=0;n.mv=false;
-    const tgt=ev.dests[i%ev.dests.length];
-    const fr=gra(n.col,n.row),trr=gra(tgt.col,tgt.row);
-    n.wps=cwp(n.col,fr,tgt.col,tgt.row,trr);n.wi=0;n.st=0;n.state='event';
-  });
-}
-function updateGEVT(dt){
-  if(!GEVT.active){GEVT.cd-=dt;if(GEVT.cd<=0){GEVT.cd=40+Math.random()*40;if(Math.random()<.4)triggerEvt()}return}
-  const g=GEVT.active;g.timer+=dt;
-  npcs.forEach(n=>{if(n.inEvt&&!n.mv&&n.wi<n.wps.length){const w=n.wps[n.wi];n.tc=w.col;n.tr=w.row;n.mv=true;n.wi++;n.aDoors()}if(n.inEvt&&!n.mv&&n.wi>=n.wps.length){n.st+=dt}});
-  g.dlgCD-=dt;if(g.dlgCD<=0){g.dlgCD=8+Math.random()*6;const n=npcs[Math.floor(Math.random()*npcs.length)];const line=g.ev.dlg[Math.floor(Math.random()*g.ev.dlg.length)];feedChat(n.name,line)}
-  if(g.timer>g.ev.dur){
-    addFeed('event','<b>'+g.ev.label+'</b> 结束了，大家回到各自岗位。');
-    npcs.forEach(n=>{n.inEvt=false;n.state='idle';n.st=0;n.nat=2+Math.random()*3;n.wps=[];n.wi=0;n.mv=false});
-    GEVT.active=null;GEVT.cd=40+Math.random()*40;
+function triggerEvt(){const ev=EVENTS[Math.floor(Math.random()*EVENTS.length)];GEVT.active={ev,timer:0,dlgCD:0};addFeed('event','<b>'+ev.label+'</b> — '+ev.announce);npcs.forEach((n,i)=>{n.inEvt=true;n.wps=[];n.wi=0;n.mv=false;const tgt=ev.dests[i%ev.dests.length];const fr=gra(n.col,n.row),trr=gra(tgt.col,tgt.row);n.wps=cwp(n.col,fr,tgt.col,tgt.row,trr);n.wi=0;n.st=0;n.state='event'})}
+function updateGEVT(dt){if(!GEVT.active){GEVT.cd-=dt;if(GEVT.cd<=0){GEVT.cd=40+Math.random()*40;if(Math.random()<.4)triggerEvt()}return}const g=GEVT.active;g.timer+=dt;npcs.forEach(n=>{if(n.inEvt&&!n.mv&&n.wi<n.wps.length){const w=n.wps[n.wi];n.tc=w.col;n.tr=w.row;n.mv=true;n.wi++;n.aDoors()}if(n.inEvt&&!n.mv&&n.wi>=n.wps.length){n.st+=dt}});g.dlgCD-=dt;if(g.dlgCD<=0){g.dlgCD=8+Math.random()*6;const n=npcs[Math.floor(Math.random()*npcs.length)];const line=g.ev.dlg[Math.floor(Math.random()*g.ev.dlg.length)];feedChat(n.name,line)}if(g.timer>g.ev.dur){addFeed('event','<b>'+g.ev.label+'</b> 结束了，大家回到各自岗位。');npcs.forEach(n=>{n.inEvt=false;n.state='idle';n.st=0;n.nat=2+Math.random()*3;n.wps=[];n.wi=0;n.mv=false});GEVT.active=null;GEVT.cd=40+Math.random()*40}}
+
+// ==================== 小游戏系统 ====================
+let mgActive=false;
+
+// ==================== 群聊输入 & NPC回应 ====================
+const ROOM_KW={'会议室':'meeting','会议':'meeting','办公':'office','办公区':'office','餐厅':'kitchen','吃饭':'kitchen','饭':'kitchen','娱乐':'ai_demo','娱乐室':'ai_demo','实验':'robot_lab','研发':'robot_lab','研发室':'robot_lab','机器人':'robot_lab','储藏':'course_dev','储藏室':'course_dev','走廊':'corridor'};
+function sendFeedMsg(text){
+  if(!text.trim())return;
+  addFeed('alex','<span class="sp" style="color:#88CCFF">Alex CEO</span>：'+text);
+  // find room keyword for movement
+  let targetRoom=null;
+  for(const[kw,rm]of Object.entries(ROOM_KW)){if(text.includes(kw)){targetRoom=rm;break}}
+  // find topic for response
+  let topic='general';
+  if(/机器人|robot|舵机|传感器|3D打印|电路|硬件|PCB|焊接|嵌入式/.test(text))topic='robot';
+  else if(/课程|教学|教案|学生|教育|课堂|课件|青少年|学员|学术|论文|研究|实验/.test(text))topic='course';
+  else if(/智能体|模型|训练|agent|AI|大模型|部署/.test(text))topic='agent';
+  else if(/工作|忙|任务|项目|代码|开发|编程|bug|功能|需求|评审/.test(text))topic='work';
+  else if(/吃|喝|饿|咖啡|食物|餐|饭/.test(text))topic='food';
+  else if(/累|休息|困|疲惫|放松/.test(text))topic='tired';
+  else if(/会议|开会|meeting|讨论/.test(text))topic='meeting';
+  else if(/音乐|吉他|鼓|键盘|娱乐/.test(text))topic='agent';
+  // pick NPCs to respond based on role relevance
+  let responders=[...npcs].sort(()=>Math.random()-.5);
+  if(topic==='robot')responders=responders.sort((a,b)=>(a.name==='KK'||a.name==='周周'?-1:1)-(b.name==='KK'||b.name==='周周'?-1:1));
+  if(topic==='work'||topic==='meeting')responders=responders.sort((a,b)=>(a.name==='鸽子'?-1:1)-(b.name==='鸽子'?-1:1));
+  const r1=responders[0];
+  setTimeout(()=>{feedChat(r1.name,pickR(r1.name,topic))},800+Math.random()*1200);
+  const r2=responders[1];
+  setTimeout(()=>{feedChat(r2.name,pickR(r2.name,topic))},2200+Math.random()*1500);
+  // if room mentioned, move NPCs there
+  if(targetRoom&&targetRoom!=='corridor'){
+    const dests=NDEST[{meeting:'meeting_state',office:'working',robot_lab:'lab_work',ai_demo:'testing',kitchen:'kitchen',course_dev:'course_dev'}[targetRoom]]||NDEST.idle;
+    npcs.forEach((n,i)=>{
+      if(n.inEvt)return;
+      const tgt=dests[i%dests.length];
+      const fr=gra(n.col,n.row);
+      n.wps=cwp(n.col,fr,tgt.col,tgt.row,targetRoom);
+      n.wi=0;n.st=0;n.state='moving';
+    });
   }
 }
+document.addEventListener('DOMContentLoaded',()=>{
+  const fi=document.getElementById('feedInput');
+  if(fi)fi.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();sendFeedMsg(fi.value);fi.value=''}});
+});
+function closeMinigame(){mgActive=false;document.getElementById('minigame-overlay').classList.remove('active')}
+function openMinigame(title,contentFn){mgActive=true;document.getElementById('mgTitle').textContent=title;document.getElementById('mgContent').innerHTML='';document.getElementById('minigame-overlay').classList.add('active');contentFn()}
+
+// ==================== 俄罗斯方块 ====================
+function startTetris(){
+  const box=document.getElementById('mgContent');
+  const cvs=document.createElement('canvas');cvs.width=250;cvs.height=500;cvs.style.display='block';cvs.style.margin='0 auto';cvs.style.background='#1A1A2E';cvs.style.border='2px solid rgba(255,255,255,0.2)';cvs.style.borderRadius='8px';box.appendChild(cvs);
+  const tc=cvs.getContext('2d');
+  const COLS=10,ROWS=20,SZ=25;
+  const SHAPES=[[[1,1,1,1]],[[1,1],[1,1]],[[0,1,0],[1,1,1]],[[1,0,0],[1,1,1]],[[0,0,1],[1,1,1]],[[1,1,0],[0,1,1]],[[0,1,1],[1,1,0]]];
+  const COLORS=['#00F0F0','#F0F000','#A000F0','#0000F0','#F0A000','#00F000','#F00000'];
+  let board=Array.from({length:ROWS},()=>Array(COLS).fill(0));
+  let cur,cx2,cy2,ci,score=0,over=false,dropT=0,dropI=500;
+  function newPiece(){ci=Math.floor(Math.random()*SHAPES.length);cur=SHAPES[ci].map(r=>[...r]);cx2=Math.floor((COLS-cur[0].length)/2);cy2=0;if(collides(cx2,cy2,cur)){over=true}}
+  function collides(px,py,sh){for(let r=0;r<sh.length;r++)for(let c=0;c<sh[r].length;c++){if(!sh[r][c])continue;const nx=px+c,ny=py+r;if(nx<0||nx>=COLS||ny>=ROWS)return true;if(ny>=0&&board[ny][nx])return true}return false}
+  function merge(){for(let r=0;r<cur.length;r++)for(let c=0;c<cur[r].length;c++){if(cur[r][c]&&cy2+r>=0)board[cy2+r][cx2+c]=ci+1}}
+  function clearLines(){let cl=0;for(let r=ROWS-1;r>=0;r--){if(board[r].every(v=>v)){board.splice(r,1);board.unshift(Array(COLS).fill(0));cl++;r++}}if(cl){score+=cl*100;dropI=Math.max(100,dropI-cl*20)}}
+  function rotate(){const rot=cur[0].map((_,c)=>cur.map(r=>r[c]).reverse());if(!collides(cx2,cy2,rot))cur=rot}
+  function drawT(){tc.fillStyle='#1A1A2E';tc.fillRect(0,0,cvs.width,cvs.height);for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){if(board[r][c]){tc.fillStyle=COLORS[board[r][c]-1];tc.fillRect(c*SZ+1,r*SZ+1,SZ-2,SZ-2)}else{tc.fillStyle='rgba(255,255,255,0.03)';tc.fillRect(c*SZ+1,r*SZ+1,SZ-2,SZ-2)}}if(cur&&!over){tc.fillStyle=COLORS[ci];for(let r=0;r<cur.length;r++)for(let c=0;c<cur[r].length;c++){if(cur[r][c])tc.fillRect((cx2+c)*SZ+1,(cy2+r)*SZ+1,SZ-2,SZ-2)}}tc.fillStyle='#FFF';tc.font='bold 16px Arial';tc.textAlign='left';tc.fillText('Score: '+score,8,20);if(over){tc.fillStyle='rgba(0,0,0,0.7)';tc.fillRect(0,0,cvs.width,cvs.height);tc.fillStyle='#FF4444';tc.font='bold 28px Arial';tc.textAlign='center';tc.fillText('GAME OVER',cvs.width/2,cvs.height/2);tc.font='16px Arial';tc.fillStyle='#FFF';tc.fillText('Score: '+score,cvs.width/2,cvs.height/2+30)}}
+  function tick(ts2){if(over||!mgActive){drawT();return}dropT+=16;if(dropT>dropI){dropT=0;if(!collides(cx2,cy2+1,cur)){cy2++}else{merge();clearLines();newPiece()}}drawT();requestAnimationFrame(tick)}
+  function onKey(e){if(over||!mgActive)return;const k=e.key;if(k==='ArrowLeft'){if(!collides(cx2-1,cy2,cur))cx2--}else if(k==='ArrowRight'){if(!collides(cx2+1,cy2,cur))cx2++}else if(k==='ArrowDown'){if(!collides(cx2,cy2+1,cur)){cy2++;score+=1}}else if(k==='ArrowUp'){rotate()}else return;e.preventDefault()}
+  document.addEventListener('keydown',onKey);
+  newPiece();requestAnimationFrame(tick);
+  // cleanup on close
+  const origClose=closeMinigame;
+  closeMinigame=function(){document.removeEventListener('keydown',onKey);origClose()}
+}
+
+// ==================== 餐厅小游戏 ====================
+const INGREDIENTS=[
+  {id:0,name:'鸡蛋',emoji:'🥚',cat:'protein'},
+  {id:1,name:'番茄',emoji:'🍅',cat:'vegetable'},
+  {id:2,name:'土豆',emoji:'🥔',cat:'vegetable'},
+  {id:3,name:'牛肉',emoji:'🥩',cat:'protein'},
+  {id:4,name:'鸡肉',emoji:'🍗',cat:'protein'},
+  {id:5,name:'米饭',emoji:'🍚',cat:'staple'},
+  {id:6,name:'面条',emoji:'🍜',cat:'staple'},
+  {id:7,name:'豆腐',emoji:'🧈',cat:'protein'},
+  {id:8,name:'白菜',emoji:'🥬',cat:'vegetable'},
+  {id:9,name:'胡萝卜',emoji:'🥕',cat:'vegetable'},
+  {id:10,name:'虾仁',emoji:'🦐',cat:'protein'},
+  {id:11,name:'青椒',emoji:'🫑',cat:'vegetable'},
+  {id:12,name:'大蒜',emoji:'🧄',cat:'seasoning'},
+  {id:13,name:'酱油',emoji:'🫗',cat:'seasoning'},
+  {id:14,name:'面粉',emoji:'🌾',cat:'staple'},
+  {id:15,name:'牛奶',emoji:'🥛',cat:'dairy'},
+  {id:16,name:'黄油',emoji:'🧈',cat:'dairy'},
+  {id:17,name:'洋葱',emoji:'🧅',cat:'vegetable'},
+  {id:18,name:'蘑菇',emoji:'🍄',cat:'vegetable'},
+  {id:19,name:'辣椒',emoji:'🌶️',cat:'seasoning'},
+];
+const RECIPES=[
+  {name:'番茄炒蛋',emoji:'🍳',desc:'经典家常菜，酸甜可口，营养丰富',need:[1,0]},
+  {name:'土豆炖牛肉',emoji:'🥘',desc:'软烂入味，冬天暖身的绝佳选择',need:[2,3]},
+  {name:'宫保鸡丁',emoji:'🍗',desc:'麻辣鲜香，花生与鸡丁的完美搭配',need:[4,11,19]},
+  {name:'蛋炒饭',emoji:'🍚',desc:'粒粒分明，简单却美味的快手菜',need:[0,5]},
+  {name:'番茄牛肉面',emoji:'🍝',desc:'浓郁汤底配上筋道面条',need:[1,3,6]},
+  {name:'麻婆豆腐',emoji:'🌶️',desc:'麻辣鲜香，四川名菜的代表',need:[7,19,13]},
+  {name:'青椒肉丝面',emoji:'🍜',desc:'清脆爽口，一碗满足',need:[11,4,6]},
+  {name:'虾仁炒蛋',emoji:'🦐',desc:'鲜嫩滑口，高蛋白低脂肪',need:[10,0]},
+  {name:'土豆泥',emoji:'🥔',desc:'绵密细腻，西餐经典配菜',need:[2,15]},
+  {name:'奶油蘑菇汤',emoji:'🍲',desc:'浓郁顺滑，暖心暖胃的西式汤品',need:[18,15,16]},
+  {name:'香煎豆腐',emoji:'🧈',desc:'外酥里嫩，简单美味的素食选择',need:[7,12,13]},
+  {name:'蛋花面',emoji:'🍜',desc:'清淡养胃，深夜食堂的温暖',need:[0,6]},
+  {name:'土豆炖鸡',emoji:'🍗',desc:'农家风味，大块吃肉的满足感',need:[2,4]},
+  {name:'胡萝卜炒蛋',emoji:'🥕',desc:'色彩缤纷，营养丰富',need:[9,0]},
+  {name:'蒜蓉虾仁',emoji:'🦐',desc:'鲜香弹牙，蒜香四溢',need:[10,12]},
+  {name:'蘑菇炒肉',emoji:'🍄',desc:'鲜美多汁，下饭神器',need:[18,3]},
+  {name:'洋葱炒蛋',emoji:'🧅',desc:'简单快手，洋葱的甜味配蛋香',need:[17,0]},
+  {name:'番茄鸡蛋面',emoji:'🍝',desc:'酸汤开胃，家常好味',need:[1,0,6]},
+  {name:'红烧牛肉',emoji:'🥩',desc:'色泽红亮，软烂入味的大菜',need:[3,13,2]},
+  {name:'蔬菜沙拉',emoji:'🥗',desc:'清新健康，维生素满满的轻食',need:[8,9,11]},
+];
+
+// ==================== 游戏选择器 ====================
+function showGameSelect(){
+  openMinigame('🎮 选择游戏',()=>{
+    const box=document.getElementById('mgContent');box.innerHTML='';
+    const games=[{name:'俄罗斯方块',emoji:'🧱',desc:'经典方块消除',fn:startTetris},{name:'打砖块',emoji:'🏓',desc:'弹球消除砖块',fn:startBreakout},{name:'贪吃蛇',emoji:'🐍',desc:'吃食物变长',fn:startSnake}];
+    const grid=document.createElement('div');grid.style.cssText='display:flex;gap:12px;justify-content:center;flex-wrap:wrap';
+    games.forEach(g=>{const card=document.createElement('div');card.style.cssText='width:140px;padding:20px;border-radius:12px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);cursor:pointer;text-align:center;transition:all .15s';
+      card.innerHTML=`<div style="font-size:40px;margin-bottom:8px">${g.emoji}</div><div style="color:#fff;font-size:15px;font-weight:700;margin-bottom:4px">${g.name}</div><div style="color:rgba(255,255,255,0.5);font-size:12px">${g.desc}</div>`;
+      card.onmouseenter=()=>{card.style.background='rgba(74,144,217,0.15)';card.style.borderColor='#4A90D9'};card.onmouseleave=()=>{card.style.background='rgba(255,255,255,0.06)';card.style.borderColor='rgba(255,255,255,0.12)'};
+      card.onclick=()=>{closeMinigame();setTimeout(()=>openMinigame(g.emoji+' '+g.name,g.fn),120)};
+      grid.appendChild(card)});box.appendChild(grid)})}
+
+// ==================== 打砖块 ====================
+function startBreakout(){
+  const box=document.getElementById('mgContent');
+  const cvs=document.createElement('canvas');cvs.width=300;cvs.height=420;cvs.style.cssText='display:block;margin:0 auto;background:#1A1A2E;border:2px solid rgba(255,255,255,0.2);border-radius:8px';box.appendChild(cvs);
+  const c2=cvs.getContext('2d'),W=300,H=420;let padW=60,padX=W/2-30,ballX=W/2,ballY=H-28,bdx=1.5,bdy=-1.5,sc=0,lives=3,over=false;
+  const ROWS=6,COLS=8,BW=W/COLS,BH=15,clr=['#FF4444','#FF8844','#FFCC44','#44CC44','#4488FF','#AA44FF'];
+  let bks=[];for(let r=0;r<ROWS;r++)for(let cl=0;cl<COLS;cl++)bks.push({x:cl*BW+1,y:r*BH+35,w:BW-2,h:BH-2,a:true,c:clr[r]});
+  function draw(){c2.fillStyle='#1A1A2E';c2.fillRect(0,0,W,H);bks.forEach(b=>{if(b.a){c2.fillStyle=b.c;c2.fillRect(b.x,b.y,b.w,b.h)}});c2.fillStyle='#FFF';c2.fillRect(padX,H-14,padW,7);c2.fillStyle='#FFD700';c2.beginPath();c2.arc(ballX,ballY,5,0,Math.PI*2);c2.fill();c2.fillStyle='#FFF';c2.font='bold 14px Arial';c2.textAlign='left';c2.fillText('Score: '+sc,8,18);c2.textAlign='right';c2.fillText('❤'.repeat(lives),W-8,18);
+    if(over){c2.fillStyle='rgba(0,0,0,0.7)';c2.fillRect(0,0,W,H);c2.fillStyle=lives<=0?'#FF4444':'#FFD700';c2.font='bold 24px Arial';c2.textAlign='center';c2.fillText(lives<=0?'GAME OVER':'YOU WIN!',W/2,H/2);c2.font='14px Arial';c2.fillStyle='#FFF';c2.fillText('Score: '+sc,W/2,H/2+30)}}
+  function upd(){if(over)return;ballX+=bdx;ballY+=bdy;if(ballX<=5||ballX>=W-5)bdx=-bdx;if(ballY<=5)bdy=-bdy;
+    if(ballY>=H-20&&ballX>=padX&&ballX<=padX+padW&&bdy>0){bdy=-bdy;bdx+=((ballX-(padX+padW/2))/(padW/2))*1;bdx=Math.max(-2.5,Math.min(2.5,bdx))}
+    if(ballY>H){lives--;if(lives<=0)over=true;else{ballX=W/2;ballY=H-28;bdx=1.5*(Math.random()>.5?1:-1);bdy=-1.5}}
+    bks.forEach(b=>{if(b.a&&ballX+5>b.x&&ballX-5<b.x+b.w&&ballY+5>b.y&&ballY-5<b.y+b.h){b.a=false;bdy=-bdy;sc+=10}});if(bks.every(b=>!b.a))over=true}
+  function tick(){if(!mgActive){draw();return}upd();draw();requestAnimationFrame(tick)}
+  function onK(e){if(over||!mgActive)return;if(e.key==='ArrowLeft'){padX=Math.max(0,padX-25);e.preventDefault()}else if(e.key==='ArrowRight'){padX=Math.min(W-padW,padX+25);e.preventDefault()}}
+  document.addEventListener('keydown',onK);const oc=closeMinigame;closeMinigame=function(){document.removeEventListener('keydown',onK);oc()};
+  draw();requestAnimationFrame(tick)}
+
+// ==================== 贪吃蛇 ====================
+function startSnake(){
+  const box=document.getElementById('mgContent');
+  const cvs=document.createElement('canvas');cvs.width=1400;cvs.height=1400;const scale=Math.min(1,(innerHeight*0.82)/1400);cvs.style.cssText='display:block;margin:0 auto;background:#0D0D1A;border:2px solid rgba(255,255,255,0.15);border-radius:10px;transform:scale('+scale+');transform-origin:top center';
+  box.appendChild(cvs);
+  const c2=cvs.getContext('2d'),COLS=40,ROWS=40,SZ=34,PAD=20,CW=1400;
+  const aiColors=[{h:'#E84444',b:'#C03030',n:'赤蛇'},{h:'#E8A844',b:'#C08830',n:'金蛇'},{h:'#44A8E8',b:'#3088C0',n:'蓝蛇'}];
+  const DIRS=[{x:1,y:0},{x:-1,y:0},{x:0,y:1},{x:0,y:-1}];
+  let foods=[],snakes=[],started=false,gameOver=false,winner='',prevTs=0;
+  let chests=[],chestTimer=0,lives=0;
+
+  function mkSnake(x,y,dx,dy,len,isP,aiIdx){const b=[];for(let i=0;i<len;i++)b.push({x:x-dx*i,y:y-dy*i});return{body:b,dir:{x:dx,y:dy},ndir:{x:dx,y:dy},isP,aiIdx,alive:true,spd:isP?130:140,accum:0}}
+  function spawnFood(){const sizes=[{sz:1,r:7,color:'#F44',pts:1},{sz:3,r:9,color:'#F94',pts:3},{sz:5,r:11,color:'#FD4',pts:5}];const s=sizes[Math.random()<0.5?0:Math.random()<0.6?1:2];let f;let tries=0;do{f={x:Math.floor(Math.random()*COLS),y:Math.floor(Math.random()*ROWS),...s};tries++}while(tries<200&&(snakes.some(sk=>sk.body.some(b=>b.x===f.x&&b.y===f.y))||foods.some(fo=>fo.x===f.x&&fo.y===f.y)||chests.some(ch=>ch.x===f.x&&ch.y===f.y)));return f}
+  function spawnChest(){let ch;let tries=0;do{ch={x:Math.floor(Math.random()*COLS),y:Math.floor(Math.random()*ROWS),timer:8};tries++}while(tries<200&&(snakes.some(sk=>sk.body.some(b=>b.x===ch.x&&b.y===ch.y))||foods.some(f=>f.x===ch.x&&f.y===ch.y)||chests.some(c=>c.x===ch.x&&c.y===ch.y)));return ch}
+  function init(){snakes=[mkSnake(10,20,1,0,3,true,-1),mkSnake(30,10,0,1,3,false,0),mkSnake(5,35,-1,0,3,false,1),mkSnake(35,30,0,-1,3,false,2)];foods=[];chests=[];chestTimer=0;lives=0;gameOver=false;winner='';started=false;for(let i=0;i<25;i++)foods.push(spawnFood())}
+  function respawnPlayer(){const player=snakes[0];const spots=[{x:10,y:20},{x:30,y:10},{x:5,y:35},{x:35,y:30},{x:20,y:20}];const grid=buildGrid(player);let spot=spots[0];for(const s of spots){if(!grid[s.y*COLS+s.x]){spot=s;break}}player.body=[{x:spot.x,y:spot.y}];player.dir={x:1,y:0};player.ndir={x:1,y:0};player.alive=true;player.spd=130;player.accum=0}
+
+  function buildGrid(excludeSnake){const g=new Uint8Array(COLS*ROWS);
+    snakes.forEach(sk=>{if(!sk.alive||sk===excludeSnake)return;sk.body.forEach(s=>{if(s.x>=0&&s.x<COLS&&s.y>=0&&s.y<ROWS)g[s.y*COLS+s.x]=1})});
+    return g}
+
+  function floodCount(sx,sy,grid,limit){if(sx<0||sx>=COLS||sy<0||sy>=ROWS||grid[sy*COLS+sx])return 0;
+    const visited=new Uint8Array(COLS*ROWS);const q=[sx+sy*COLS];visited[sx+sy*COLS]=1;let cnt=0;
+    while(q.length&&cnt<limit){const p=q.shift();const px=p%COLS,py=Math.floor(p/COLS);cnt++;
+      for(const d of DIRS){const nx=px+d.x,ny=py+d.y,nk=ny*COLS+nx;
+        if(nx>=0&&nx<COLS&&ny>=0&&ny<ROWS&&!visited[nk]&&!grid[nk]){visited[nk]=1;q.push(nk)}}}
+    return cnt}
+
+  function isSafe(nx,ny,grid){return nx>=0&&nx<COLS&&ny>=0&&ny<ROWS&&!grid[ny*COLS+nx]}
+
+  function aiThink(sk){
+    const h=sk.body[0];
+    const grid=buildGrid(sk);
+    for(let i=0;i<sk.body.length-1;i++){const s=sk.body[i];if(s.x>=0&&s.x<COLS&&s.y>=0&&s.y<ROWS)grid[s.y*COLS+s.x]=1}
+    const candidates=[];
+    for(const d of DIRS){
+      if(d.x===-sk.dir.x&&d.y===-sk.dir.y)continue;
+      const nx=h.x+d.x,ny=h.y+d.y;
+      if(!isSafe(nx,ny,grid))continue;
+      const tail=sk.body[sk.body.length-1];const ti=tail.y*COLS+tail.x;grid[ti]=0;
+      const space=floodCount(nx,ny,grid,60);grid[ti]=1;
+      let foodScore=0;
+      for(const f of foods){const dist=Math.abs(f.x-nx)+Math.abs(f.y-ny);const sc=f.pts/(dist+1);if(sc>foodScore)foodScore=sc}
+      // AI also targets chests for extra lives
+      let chestScore=0;
+      for(const ch of chests){const dist=Math.abs(ch.x-nx)+Math.abs(ch.y-ny);const sc=2/(dist+1);if(sc>chestScore)chestScore=sc}
+      let headDanger=0;
+      snakes.forEach(other=>{if(!other.alive||other===sk)return;const oh=other.body[0];
+        if(Math.abs(oh.x-nx)+Math.abs(oh.y-ny)<=2)headDanger+=0.5;
+        const onx=oh.x+other.dir.x,ony=oh.y+other.dir.y;if(onx===nx&&ony===ny)headDanger+=1});
+      let cutoffBonus=0;
+      snakes.forEach(other=>{if(!other.alive||other===sk||other.body.length>=sk.body.length)return;
+        const oh=other.body[0];if(Math.abs(oh.x-nx)+Math.abs(oh.y-ny)<=3)cutoffBonus+=0.3});
+      let wallPenalty=0;if(nx<=1||nx>=COLS-2)wallPenalty+=0.3;if(ny<=1||ny>=ROWS-2)wallPenalty+=0.3;
+      candidates.push({d,score:space*0.15+(foodScore+chestScore)*3-headDanger*5+cutoffBonus-wallPenalty})}
+    if(!candidates.length)return;
+    candidates.sort((a,b)=>b.score-a.score);
+    let pick;
+    if(candidates.length>=3&&Math.random()<0.1)pick=candidates[2];
+    else if(candidates.length>=2&&Math.random()<0.2)pick=candidates[1];
+    else pick=candidates[0];
+    const nx=h.x+pick.d.x,ny=h.y+pick.d.y;
+    const tail=sk.body[sk.body.length-1];const ti=tail.y*COLS+tail.x;grid[ti]=0;
+    const space=floodCount(nx,ny,grid,30);grid[ti]=1;
+    if(space<5&&candidates.length>1){for(const c of candidates){const cx2=h.x+c.d.x,cy2=h.y+c.d.y;grid[ti]=0;const sp=floodCount(cx2,cy2,grid,30);grid[ti]=1;if(sp>=5){pick=c;break}}}
+    sk.ndir={...pick.d}}
+
+  function moveSnake(sk){
+    sk.dir={...sk.ndir};const h=sk.body[0];const nh={x:h.x+sk.dir.x,y:h.y+sk.dir.y};
+    if(nh.x<0||nh.x>=COLS||nh.y<0||nh.y>=ROWS){sk.alive=false;return}
+    for(let i=0;i<sk.body.length-1;i++){if(sk.body[i].x===nh.x&&sk.body[i].y===nh.y){sk.alive=false;return}}
+    for(const other of snakes){if(other===sk||!other.alive)continue;
+      for(let i=0;i<other.body.length;i++){if(other.body[i].x===nh.x&&other.body[i].y===nh.y){sk.alive=false;return}}}
+    sk.body.unshift(nh);
+    // food
+    let ate=false;
+    for(let i=foods.length-1;i>=0;i--){if(foods[i].x===nh.x&&foods[i].y===nh.y){const f=foods[i];for(let j=0;j<f.sz-1;j++)sk.body.push({...sk.body[sk.body.length-1]});foods.splice(i,1);foods.push(spawnFood());ate=true;break}}
+    // chest pickup
+    for(let i=chests.length-1;i>=0;i--){if(chests[i].x===nh.x&&chests[i].y===nh.y){chests.splice(i,1);lives++;ate=true;break}}
+    if(!ate)sk.body.pop()}
+
+  function checkCollisions(){
+    const alive=snakes.filter(s=>s.alive);
+    for(let i=0;i<alive.length;i++){for(let j=i+1;j<alive.length;j++){
+      if(alive[i].body[0].x===alive[j].body[0].x&&alive[i].body[0].y===alive[j].body[0].y){
+        if(alive[i].body.length>alive[j].body.length){alive[j].alive=false;for(let k=0;k<Math.min(alive[j].body.length,10);k++)alive[i].body.push({...alive[i].body[alive[i].body.length-1]});alive[i].spd=Math.max(80,alive[i].spd-3)}
+        else if(alive[j].body.length>alive[i].body.length){alive[i].alive=false;for(let k=0;k<Math.min(alive[i].body.length,10);k++)alive[j].body.push({...alive[j].body[alive[j].body.length-1]});alive[j].spd=Math.max(80,alive[j].spd-3)}
+        else{alive[i].alive=false;alive[j].alive=false}}}}
+    // player died
+    if(!snakes[0].alive){
+      if(lives>0){lives--;respawnPlayer()}
+      else{gameOver=true;const nowAlive=snakes.filter(s=>s.alive);winner=nowAlive.length===1?(nowAlive[0].isP?'你':aiColors[nowAlive[0].aiIdx].n):'没人';return}}
+    // AI only died - just check for last alive
+    const nowAlive=snakes.filter(s=>s.alive);
+    if(nowAlive.length===1&&nowAlive[0].isP){gameOver=true;winner='你'}
+    else if(nowAlive.length===0){gameOver=true;winner='没人'}}
+
+  function tick(ts){
+    if(!mgActive){draw();return}
+    if(prevTs===0)prevTs=ts;const dt=ts-prevTs;prevTs=ts;
+    if(started&&!gameOver){
+      // chest spawn timer
+      chestTimer+=dt;
+      if(chestTimer>=10){chestTimer=0;chests.push(spawnChest())}
+      // chest expiry
+      for(let i=chests.length-1;i>=0;i--){chests[i].timer-=dt;if(chests[i].timer<=0)chests.splice(i,1)}
+      // AI think
+      snakes.forEach(sk=>{if(!sk.alive||sk.isP)return;aiThink(sk)});
+      // move all
+      snakes.forEach(sk=>{if(!sk.alive)return;sk.accum+=dt;if(sk.accum>=sk.spd){sk.accum-=sk.spd;moveSnake(sk)}});
+      checkCollisions()}
+    draw();requestAnimationFrame(tick)}
+
+  function draw(){
+    const ox=PAD,oy=PAD;c2.fillStyle='#0D0D1A';c2.fillRect(0,0,CW,CW);
+    c2.fillStyle='#111122';c2.fillRect(ox,oy,COLS*SZ,ROWS*SZ);
+    c2.strokeStyle='rgba(255,255,255,0.03)';c2.lineWidth=.5;
+    for(let i=0;i<=COLS;i++){c2.beginPath();c2.moveTo(ox+i*SZ,oy);c2.lineTo(ox+i*SZ,oy+ROWS*SZ);c2.stroke()}
+    for(let i=0;i<=ROWS;i++){c2.beginPath();c2.moveTo(ox,oy+i*SZ);c2.lineTo(ox+COLS*SZ,oy+i*SZ);c2.stroke()}
+    // food
+    foods.forEach(f=>{c2.fillStyle=f.color;c2.beginPath();c2.arc(ox+f.x*SZ+SZ/2,oy+f.y*SZ+SZ/2,f.r,0,Math.PI*2);c2.fill();
+      c2.fillStyle='rgba(255,255,255,0.3)';c2.beginPath();c2.arc(ox+f.x*SZ+SZ/2-2,oy+f.y*SZ+SZ/2-2,f.r*.4,0,Math.PI*2);c2.fill()});
+    // chests
+    chests.forEach(ch=>{const cx=ox+ch.x*SZ+SZ/2,cy=oy+ch.y*SZ+SZ/2;
+      const pulse=1+Math.sin(Date.now()*0.005)*0.15;
+      c2.save();c2.translate(cx,cy);c2.scale(pulse,pulse);
+      c2.fillStyle='#D4A017';c2.fillRect(-12,-10,24,20);
+      c2.fillStyle='#B8860B';c2.fillRect(-12,-10,24,6);
+      c2.fillStyle='#FFD700';c2.fillRect(-3,-4,6,4);
+      c2.fillStyle='#FFF';c2.fillRect(-8,-8,5,2);c2.fillRect(3,-8,5,2);
+      c2.strokeStyle='#8B6914';c2.lineWidth=2;c2.strokeRect(-12,-10,24,20);
+      c2.restore();
+      // countdown ring
+      const pct=ch.timer/8;
+      c2.strokeStyle='rgba(255,215,0,'+(pct>0.3?0.6:0.9)+')';c2.lineWidth=2;
+      c2.beginPath();c2.arc(cx,cy,18,-Math.PI/2,-Math.PI/2+Math.PI*2*pct);c2.stroke()});
+    // snakes
+    snakes.forEach(sk=>{if(!sk.alive)return;const clr=sk.isP?{h:'#4F4',b:'#2A2'}:aiColors[sk.aiIdx];
+      sk.body.forEach((s,i)=>{const px=ox+s.x*SZ,py=oy+s.y*SZ;
+        if(i===0){c2.fillStyle=clr.h;c2.beginPath();c2.roundRect(px+1,py+1,SZ-2,SZ-2,6);c2.fill();
+          c2.fillStyle='#FFF';const ex1=px+SZ*0.25,ex2=px+SZ*0.7,ey=py+SZ*0.35;
+          c2.beginPath();c2.arc(ex1,ey,4,0,Math.PI*2);c2.fill();c2.beginPath();c2.arc(ex2,ey,4,0,Math.PI*2);c2.fill();
+          c2.fillStyle='#111';c2.beginPath();c2.arc(ex1+1,ey,2,0,Math.PI*2);c2.fill();c2.beginPath();c2.arc(ex2+1,ey,2,0,Math.PI*2);c2.fill()}
+        else{c2.fillStyle=i%3===0?clr.h:clr.b;c2.beginPath();c2.roundRect(px+2,py+2,SZ-4,SZ-4,4);c2.fill()}});
+      if(sk.isP){const h=sk.body[0];c2.fillStyle='#4F4';c2.font='bold 13px Arial';c2.textAlign='center';c2.fillText('YOU',ox+h.x*SZ+SZ/2,oy+h.y*SZ-6)}});
+    // HUD
+    const alive=snakes.filter(s=>s.alive);
+    c2.fillStyle='rgba(0,0,0,0.65)';c2.fillRect(0,0,CW,44);
+    c2.fillStyle='#FFF';c2.font='bold 20px "PingFang SC"';c2.textAlign='left';c2.fillText('🐍 蛇蛇大作战',16,28);
+    // lives display
+    if(lives>0){c2.fillStyle='#FFD700';c2.font='bold 16px Arial';c2.textAlign='left';c2.fillText('❤️x'+lives,170,28)}
+    // chest countdown
+    c2.fillStyle='#D4A017';c2.font='14px Arial';c2.textAlign='left';c2.fillText('📦 '+(10-Math.floor(chestTimer))+'s',250,28);
+    let lx=370;snakes.forEach((sk,i)=>{if(!sk.alive){c2.fillStyle='rgba(255,255,255,0.2)';c2.font='16px Arial';c2.textAlign='left';c2.fillText((sk.isP?'你':aiColors[sk.aiIdx].n)+' ☠',lx,28);lx+=110;return}
+      c2.fillStyle=sk.isP?'#4F4':aiColors[sk.aiIdx].h;c2.font='bold 16px Arial';c2.textAlign='left';c2.fillText((sk.isP?'你':aiColors[sk.aiIdx].n)+':'+sk.body.length,lx,28);lx+=120});
+    c2.fillStyle='#FFF';c2.font='16px Arial';c2.textAlign='right';c2.fillText('存活 '+alive.length+' 条',CW-16,28);
+    // start screen
+    if(!started&&!gameOver){c2.fillStyle='rgba(0,0,0,0.7)';c2.fillRect(0,0,CW,CW);
+      c2.fillStyle='#FFF';c2.font='bold 36px "PingFang SC"';c2.textAlign='center';c2.fillText('🐍 蛇蛇大作战',CW/2,CW/2-100);
+      c2.font='22px "PingFang SC"';c2.fillStyle='rgba(255,255,255,0.7)';c2.fillText('按方向键开始！吃豆子成长，吞噬其他蛇！',CW/2,CW/2-50);
+      c2.font='16px "PingFang SC"';c2.fillStyle='rgba(255,255,255,0.4)';c2.fillText('🔴小豆+1   🟠中豆+3   🟡大豆+5   最后存活者获胜',CW/2,CW/2-10);
+      c2.fillStyle='#D4A017';c2.fillText('📦 每10秒出现宝箱，拾取后获得复活次数！',CW/2,CW/2+25);
+      c2.font='18px "PingFang SC"';c2.fillStyle='#4F4';c2.fillText('🟢 你',CW/2-180,CW/2+70);c2.fillStyle='#E84444';c2.fillText('🔴 赤蛇',CW/2-60,CW/2+70);c2.fillStyle='#E8A844';c2.fillText('🟠 金蛇',CW/2+60,CW/2+70);c2.fillStyle='#44A8E8';c2.fillText('🔵 蓝蛇',CW/2+180,CW/2+70)}
+    // game over
+    if(gameOver){c2.fillStyle='rgba(0,0,0,0.8)';c2.fillRect(0,0,CW,CW);
+      c2.fillStyle=winner==='你'?'#FFD700':'#FF6666';c2.font='bold 44px Arial';c2.textAlign='center';c2.fillText(winner==='你'?'🎉 你赢了！':'💀 '+winner+' 获胜',CW/2,CW/2-40);
+      c2.fillStyle='#FFF';c2.font='22px Arial';c2.fillText('你的长度: '+snakes[0].body.length,CW/2,CW/2+10);
+      c2.fillStyle='rgba(255,255,255,0.5)';c2.font='18px "PingFang SC"';c2.fillText('关闭窗口重来',CW/2,CW/2+50)}}
+
+  function onK(e){if(!mgActive)return;const k=e.key;
+    if(k==='ArrowUp'&&snakes[0].dir.y!==1){snakes[0].ndir={x:0,y:-1};started=true;e.preventDefault()}
+    else if(k==='ArrowDown'&&snakes[0].dir.y!==-1){snakes[0].ndir={x:0,y:1};started=true;e.preventDefault()}
+    else if(k==='ArrowLeft'&&snakes[0].dir.x!==1){snakes[0].ndir={x:-1,y:0};started=true;e.preventDefault()}
+    else if(k==='ArrowRight'&&snakes[0].dir.x!==-1){snakes[0].ndir={x:1,y:0};started=true;e.preventDefault()}}
+  init();document.addEventListener('keydown',onK);const oc=closeMinigame;closeMinigame=function(){document.removeEventListener('keydown',onK);oc()};
+  draw();requestAnimationFrame(tick)}
+
+
+
+// ==================== 增强版餐厅小游戏 ====================
+function startCooking(){
+  const box=document.getElementById('mgContent');let recipe=null,selected=new Set(),cookScore=0;
+  const steps=['📋 选菜谱','🥘 备食材','🔥 掌火候','⭐ 出锅'];
+  function stepBar(s){const b=document.createElement('div');b.style.cssText='display:flex;gap:4px;justify-content:center;margin-bottom:14px';steps.forEach((t,i)=>{const d=document.createElement('span');d.style.cssText=`padding:4px 10px;border-radius:10px;font-size:11px;${i<=s?'background:rgba(74,144,217,0.3);color:#88CCFF':'background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.3)'}`;d.textContent=t;b.appendChild(d)});return b}
+  function phase1(){box.innerHTML='';box.appendChild(stepBar(0));
+    const hd=document.createElement('div');hd.style.cssText='color:#fff;font-size:16px;font-weight:700;text-align:center;margin-bottom:12px';hd.textContent='选择一道菜来挑战！';box.appendChild(hd);
+    const grid=document.createElement('div');grid.style.cssText='display:flex;flex-wrap:wrap;gap:8px;justify-content:center;max-height:360px;overflow-y:auto';
+    const picks=[...RECIPES].sort(()=>Math.random()-.5).slice(0,8);
+    picks.forEach(r=>{const card=document.createElement('div');const diff=r.need.length<=2?'⭐':r.need.length<=3?'⭐⭐':'⭐⭐⭐';
+      card.style.cssText='width:120px;padding:12px;border-radius:10px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);cursor:pointer;text-align:center;transition:all .15s';
+      card.innerHTML=`<div style="font-size:28px;margin-bottom:4px">${r.emoji}</div><div style="color:#fff;font-size:12px;font-weight:700">${r.name}</div><div style="color:#FFD700;font-size:10px;margin-top:2px">${diff}</div>`;
+      card.onmouseenter=()=>{card.style.borderColor='#4A90D9';card.style.background='rgba(74,144,217,0.12)'};card.onmouseleave=()=>{card.style.borderColor='rgba(255,255,255,0.1)';card.style.background='rgba(255,255,255,0.06)'};
+      card.onclick=()=>{recipe=r;phase2()};grid.appendChild(card)});box.appendChild(grid)}
+  function phase2(){selected=new Set();box.innerHTML='';box.appendChild(stepBar(1));
+    const hd=document.createElement('div');hd.style.cssText='color:#fff;font-size:14px;font-weight:700;text-align:center;margin-bottom:4px';hd.textContent=`「${recipe.name}」— 选出正确的食材！`;box.appendChild(hd);
+    const hint=document.createElement('div');hint.style.cssText='color:rgba(255,255,255,0.4);font-size:11px;text-align:center;margin-bottom:10px';hint.textContent=`需要 ${recipe.need.length} 种食材，注意别选错！`;box.appendChild(hint);
+    const allIds=new Set(recipe.need);while(allIds.size<Math.min(12,INGREDIENTS.length))allIds.add(Math.floor(Math.random()*INGREDIENTS.length));
+    const ingList=[...allIds].map(id=>INGREDIENTS[id]).filter(Boolean).sort(()=>Math.random()-.5);
+    function renderIng(){const grid=document.createElement('div');grid.style.cssText='display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-bottom:14px';
+      ingList.forEach(ing=>{const btn=document.createElement('div');const sel=selected.has(ing.id);
+        btn.style.cssText=`width:64px;height:64px;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;border:2px solid ${sel?'#4A90D9':'rgba(255,255,255,0.12)'};background:${sel?'rgba(74,144,217,0.2)':'rgba(255,255,255,0.04)'};transition:all .12s`;
+        btn.innerHTML=`<span style="font-size:22px">${ing.emoji}</span><span style="color:#fff;font-size:9px;margin-top:1px">${ing.name}</span>`;
+        btn.onclick=()=>{if(selected.has(ing.id))selected.delete(ing.id);else if(selected.size<recipe.need.length+2)selected.add(ing.id);refreshIng()};grid.appendChild(btn)});
+      return grid}
+    const ingArea=document.createElement('div');ingArea.id='ingArea';box.appendChild(ingArea);
+    const btnArea=document.createElement('div');btnArea.style.cssText='text-align:center';box.appendChild(btnArea);
+    function refreshIng(){ingArea.innerHTML='';ingArea.appendChild(renderIng());btnArea.innerHTML='';
+      const btn=document.createElement('button');btn.style.cssText='padding:10px 32px;font-size:14px;border:none;border-radius:20px;cursor:pointer;font-weight:600;color:#fff;background:linear-gradient(135deg,#4A90D9,#357ABD)';
+      btn.textContent=`确认食材 (${selected.size}/${recipe.need.length})`;btn.onclick=phase3;btnArea.appendChild(btn)}
+    refreshIng()}
+  function phase3(){box.innerHTML='';box.appendChild(stepBar(2));
+    const selArr=[...selected],correct=recipe.need.filter(n=>selArr.includes(n)).length,wrong=selArr.filter(n=>!recipe.need.includes(n)).length;
+    const ingScore=Math.max(0,Math.round((correct-wrong)/recipe.need.length*100));
+    const hd=document.createElement('div');hd.style.cssText='color:#fff;font-size:14px;font-weight:700;text-align:center;margin-bottom:8px';hd.textContent=`「${recipe.name}」— 掌握火候！按空格锁定！`;box.appendChild(hd);
+    const cvs=document.createElement('canvas');cvs.width=300;cvs.height=180;cvs.style.cssText='display:block;margin:0 auto;border-radius:8px';box.appendChild(cvs);
+    const c2=cvs.getContext('2d');let pos=0,d2=1,spd2=2.5,locked=false,result2=null;
+    const gS=35+Math.random()*30,gE=gS+12+Math.random()*8,yS=gE+5,yE=yS+15;
+    function drawC(){c2.fillStyle='#1A1A2E';c2.fillRect(0,0,300,180);
+      c2.fillStyle='#333';c2.fillRect(30,70,240,30);
+      c2.fillStyle='rgba(255,80,80,0.3)';c2.fillRect(30,70,gS*2.4,30);
+      c2.fillStyle='rgba(80,255,80,0.4)';c2.fillRect(30+gS*2.4,70,(gE-gS)*2.4,30);
+      c2.fillStyle='rgba(80,180,255,0.3)';c2.fillRect(30+gE*2.4,70,(yE-gE)*2.4,30);
+      c2.fillStyle='rgba(255,80,80,0.3)';c2.fillRect(30+yE*2.4,70,(100-yE)*2.4,30);
+      c2.font='10px "PingFang SC"';c2.textAlign='center';
+      c2.fillStyle='rgba(255,255,255,0.5)';c2.fillText('🔥生',30+gS*1.2,65);c2.fillText('✨完美',30+(gS+gE)*1.2,65);c2.fillText('👍不错',30+(gE+yE)*1.2,65);c2.fillText('🔥焦',30+(yE+100)*1.2,65);
+      c2.fillStyle=locked?'#FFD700':'#FFF';c2.fillRect(30+pos*2.4-2,60,4,50);
+      if(!locked){c2.fillStyle='rgba(255,255,255,0.7)';c2.font='13px "PingFang SC"';c2.fillText('按空格锁定火候！',150,140)}}
+    function onK2(e){if(e.key===' '&&!locked){e.preventDefault();locked=true;
+      if(pos>=gS&&pos<=gE){result2='perfect';cookScore=100}else if(pos>=gE&&pos<=yE){result2='good';cookScore=65}else{result2='bad';cookScore=20}
+      drawC();setTimeout(()=>phase4(ingScore,cookScore),1000)}}
+    document.addEventListener('keydown',onK2);const oc=closeMinigame;closeMinigame=function(){document.removeEventListener('keydown',onK2);oc()};
+    function tick(){if(!mgActive){drawC();return}if(!locked){pos+=d2*spd2;if(pos>=100||pos<=0)d2=-d2;pos=Math.max(0,Math.min(100,pos))}drawC();requestAnimationFrame(tick)}tick()}
+  function phase4(ingS,ckS){const total=Math.round(ingS*0.5+ckS*0.5);const stars=total>=85?'⭐⭐⭐':total>=55?'⭐⭐':'⭐';
+    box.innerHTML='';box.appendChild(stepBar(3));const card=document.createElement('div');card.style.cssText='text-align:center;padding:12px';
+    if(total<25){card.innerHTML=`<div style="font-size:52px;margin-bottom:10px">😵</div><div style="color:#FF6B6B;font-size:18px;font-weight:700">烹饪失败！</div><div style="color:rgba(255,255,255,0.5);font-size:12px;margin-top:6px">注意食材选择和火候控制哦～</div>`}
+    else{card.innerHTML=`<div style="font-size:52px;margin-bottom:10px">${recipe.emoji}</div><div style="color:#FFD700;font-size:20px;font-weight:700">${recipe.name}</div><div style="margin:8px 0;font-size:18px">${stars}</div><div style="color:rgba(255,255,255,0.5);font-size:11px">食材 ${ingS}% · 火候 ${ckS%100 > 0 ? ckS : 100}% · 综合 ${total}%</div><div style="color:rgba(255,255,255,0.6);font-size:12px;margin-top:6px;max-width:240px;margin-left:auto;margin-right:auto">${recipe.desc}</div>`}
+    const btn=document.createElement('button');btn.style.cssText='margin-top:14px;padding:8px 28px;font-size:14px;border:none;border-radius:16px;cursor:pointer;color:#fff;background:linear-gradient(135deg,#4A90D9,#357ABD)';btn.textContent='再来一次';btn.onclick=phase1;card.appendChild(btn);box.appendChild(card)}
+  phase1()}
 
 // ==================== 游戏状态 ====================
 let player,npcs=[],started=false,dlgAct=false,actNPC=null,keys={},lastT=0,fc=0;
 function initGame(){
   player=new Ch(10,10.5,PC,'Alex',true);
-  const starts=[{col:6,row:3},{col:10,row:3},{col:7,row:7},{col:12,row:7}];
+  const starts=[{col:6,row:3},{col:8,row:3},{col:7,row:7},{col:10,row:7}];
   npcs=starts.map((s,i)=>{const d=ND[i];return new NPC(s.col,s.row,{body:d.body,dark:d.dark,light:d.light},d.name,d.title,i)});
-  DD.office_corridor.open=true;DD.office_corridor.anim=1;
+  DD.meeting_corridor.open=true;DD.meeting_corridor.anim=1;DD.robot_lab_corridor.open=true;DD.robot_lab_corridor.anim=1;
   ap.lastInput=performance.now();
-  addFeed('event','欢迎 <b>Alex顾问</b> 来到 <b>LebotWorld AI教育</b>！新的一天开始了～');
+  if(feedData.length>0){loadSavedFeed();addFeed('event','<b>Alex CEO</b> 回到了 <b>LebotWorld</b>！')}
+  else{addFeed('event','欢迎 <b>Alex CEO</b> 来到 <b>LebotWorld</b>！让每个孩子成为AI时代的原住民！')}
 }
 
 // ==================== 输入 ====================
-function breakAP(){ap.lastInput=performance.now();if(ap.active){ap.active=false;player.mv=false;addFeed('autopilot','Alex顾问 回来了！')}}
-document.addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=true;breakAP();
-  if(e.key===' '){e.preventDefault();if(dlgAct)closeDialog();else talkNear()}
+function breakAP(){ap.lastInput=performance.now();if(ap.active){ap.active=false;player.mv=false;addFeed('autopilot','Alex CEO 回来了！')}}
+document.addEventListener('keydown',e=>{
+  if(mgActive){return}
+  keys[e.key.toLowerCase()]=true;breakAP();
+  if(e.key===' '){e.preventDefault();
+    if(dlgAct)closeDialog();
+    else{
+      const rm=gra(player.col,player.row);
+      if(rm==='ai_demo'){showGameSelect();return}
+      if(rm==='kitchen'){openMinigame('🍳 餐厅小游戏',startCooking);return}
+      talkNear();
+    }}
   if(e.key==='Escape'&&dlgAct)closeDialog()});
 document.addEventListener('keyup',e=>{keys[e.key.toLowerCase()]=false});
-cv.addEventListener('click',e=>{breakAP();if(dlgAct)return;const r=cv.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;
+cv.addEventListener('click',e=>{breakAP();if(dlgAct||mgActive)return;const r=cv.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;
   for(const n of npcs){const s=n.sp;if(Math.sqrt((mx-s.x)**2+(my-(s.y-20))**2)<30&&player.dist(n)<3){openDlg(n);return}}});
 function talkNear(){let nr=null,md=3;for(const n of npcs){const d=player.dist(n);if(d<md){md=d;nr=n}}if(nr)openDlg(nr)}
 
@@ -408,7 +818,7 @@ function talkNear(){let nr=null,md=3;for(const n of npcs){const d=player.dist(n)
 function genR(txt,npc){const p=NPC_P[npc.name];if(!p)return'...';let t='general';
   if(/你好|嗨|hi|hello|嘿|早|在吗/.test(txt))t='greet';
   else if(/机器人|robot|舵机|传感器|3D打印|电路|硬件|PCB|焊接|嵌入式|主板/.test(txt))t='robot';
-  else if(/课程|教学|教案|学生|教育|课堂|课件|培训|老师|学校|青少年|孩子|学员|初中|小学|中学|年龄|客户需求/.test(txt))t='course';
+  else if(/课程|教学|教案|学生|教育|课堂|课件|培训|老师|学校|青少年|孩子|学员|初中|小学|中学|年龄|客户需求|学术|论文|研究|实验/.test(txt))t='course';
   else if(/智能体|模型|训练|平台|agent|AI|大模型|部署|prompt|RAG/.test(txt))t='agent';
   else if(/工作|忙|任务|项目|代码|开发|编程|bug|功能|在做|干嘛|需求|评审/.test(txt))t='work';
   else if(/吃|喝|饿|咖啡|食物|餐|饭|零食/.test(txt))t='food';
@@ -428,7 +838,7 @@ NPC.prototype.greet=function(){const p=NPC_P[this.name];if(p)return p.greet[Math
 
 // ==================== 玩家移动 ====================
 function uP(dt){
-  if(dlgAct)return;
+  if(dlgAct||mgActive)return;
   if(ap.active){updateAP(dt);
     const gc=Math.round(player.col),gr=Math.round(player.row);
     if(gc>=0&&gc<MC&&gr>=0&&gr<MR)document.getElementById('roomLabel').textContent=RC[grk(gr,gc)]?RC[grk(gr,gc)].label:'走廊';
@@ -447,19 +857,36 @@ function uP(dt){
 function uD(dt){for(const[id,d]of Object.entries(DD)){const cc=dcx(d);let near=false;if(Math.sqrt((player.col-cc)**2+(player.row-d.y)**2)<2)near=true;for(const n of npcs)if(Math.sqrt((n.col-cc)**2+(n.row-d.y)**2)<2)near=true;if(near)d.anim=Math.min(1,d.anim+dt*3);else d.anim=Math.max(0,d.anim-dt*2);d.open=d.anim>.8}}
 
 // ==================== 镜头 ====================
-function uC(){const tx=(player.col-player.row)*(TW/2),ty=(player.col+player.row)*(TH/2);camX+=(tx-camX)*.15;camY+=(ty-camY)*.15}
+function uC(){camX=43;camY=716-cv.height/2}
 
 // ==================== 小地图 ====================
 function dM(){const mw=180,mh=160,sx=mw/MC,sy=mh/MR;mx.fillStyle='#1A1A2E';mx.fillRect(0,0,mw,mh);for(let r=0;r<MR;r++)for(let c=0;c<MC;c++){mx.fillStyle=RC[grk(r,c)].floor;mx.fillRect(c*sx,r*sy,sx-.5,sy-.5)}mx.fillStyle='rgba(0,0,0,0.3)';FL.forEach(f=>{if(!f.noBlock)for(let dr=0;dr<f.h;dr++)for(let dc=0;dc<f.w;dc++)mx.fillRect((f.col+dc)*sx,(f.row+dr)*sy,sx,sy)});for(const[id,d]of Object.entries(DD)){mx.fillStyle=d.anim>.8?'rgba(80,200,80,0.7)':'rgba(200,100,50,0.7)';mx.fillRect(d.x1*sx,(d.y-.3)*sy,(d.x2-d.x1)*sx,sy*.6)}npcs.forEach(n=>{mx.fillStyle=n.cl.body;mx.beginPath();mx.arc(n.col*sx,n.row*sy,3,0,Math.PI*2);mx.fill()});mx.fillStyle='#4A90D9';mx.strokeStyle='#FFF';mx.lineWidth=1.5;mx.beginPath();mx.arc(player.col*sx,player.row*sy,4,0,Math.PI*2);mx.fill();mx.stroke()}
 
 // ==================== 主渲染 ====================
-function gE(){const els=[];FL.forEach(f=>els.push({t:'f',it:f,d:f.col+f.row}));els.push({t:'p',ch:player,d:player.col+player.row});npcs.forEach(n=>els.push({t:'n',ch:n,d:n.col+n.row}));return els.sort((a,b)=>a.d-b.d)}
-function render(){cx.clearRect(0,0,cv.width,cv.height);const bg=cx.createLinearGradient(0,0,0,cv.height);bg.addColorStop(0,'#2A2A3E');bg.addColorStop(1,'#1A1A2E');cx.fillStyle=bg;cx.fillRect(0,0,cv.width,cv.height);drawFloor();drawLabels();drawWalls();drawDoors();gE().forEach(el=>{if(el.t==='f')dFI(el.it);else if(el.t==='p')el.ch.draw();else if(el.t==='n'){el.ch.draw();if(player.dist(el.ch)<3&&!dlgAct){const s=el.ch.sp;cx.fillStyle='rgba(255,255,255,0.8)';cx.font='10px "PingFang SC"';cx.textAlign='center';cx.fillText('点击对话',s.x,s.y-50)}const s=el.ch.sp;const em={idle:'💤',working:'💻',testing:'🤖',lab_work:'🔧',kitchen:'☕',course_dev:'📚',meeting_state:'📋',event:'📢'};cx.font='12px Arial';cx.textAlign='center';cx.fillText(em[el.ch.state]||'💤',s.x+18,s.y-35)}})}
+function gE(){const els=[];FL.forEach(f=>els.push({t:'f',it:f,d:f.col+f.row}));npcs.forEach(n=>els.push({t:'n',ch:n,d:n.col+n.row}));return els.sort((a,b)=>a.d-b.d)}
+function render(){cx.clearRect(0,0,cv.width,cv.height);const bg=cx.createLinearGradient(0,0,0,cv.height);bg.addColorStop(0,'#2A2A3E');bg.addColorStop(1,'#1A1A2E');cx.fillStyle=bg;cx.fillRect(0,0,cv.width,cv.height);drawFloor();drawLabels();
+  const wallSegs=tagWalls(bws());
+  const glassW=wallSegs.filter(s=>s.glass);
+  const solidW=wallSegs.filter(s=>!s.glass);
+  // 1. glass walls first (behind everything)
+  dWS(glassW);
+  // 2. entities (furniture + NPCs)
+  gE().forEach(el=>{if(el.t==='f')dFI(el.it);else if(el.t==='n'){el.ch.draw();if(player.dist(el.ch)<3&&!dlgAct){const s=el.ch.sp;cx.fillStyle='rgba(255,255,255,0.8)';cx.font='10px "PingFang SC"';cx.textAlign='center';cx.fillText('点击对话',s.x,s.y-50)}const s=el.ch.sp;const em={idle:'💤',working:'💻',testing:'🤖',lab_work:'🔧',kitchen:'☕',course_dev:'📚',meeting_state:'📋',event:'📢',moving:'🚶'};cx.font='12px Arial';cx.textAlign='center';cx.fillText(em[el.ch.state]||'💤',s.x+18,s.y-35)}});
+  // 3. solid walls on top (cover glass at corners)
+  dWS(solidW);
+  // 4. doors
+  drawDoors();
+  // 5. player always on top
+  player.draw();
+  const prm=gra(player.col,player.row);
+  if(prm==='ai_demo'&&!dlgAct){const pp=ts(player.col,player.row);cx.fillStyle='rgba(255,255,255,0.5)';cx.font='10px "PingFang SC"';cx.textAlign='center';cx.fillText('按空格选择游戏',pp.x,pp.y-40)}
+  if(prm==='kitchen'&&!dlgAct){const pp=ts(player.col,player.row);cx.fillStyle='rgba(255,255,255,0.5)';cx.font='10px "PingFang SC"';cx.textAlign='center';cx.fillText('按空格开始烹饪',pp.x,pp.y-40)}
+}
 
 // ==================== 游戏循环 ====================
-function loop(ts){if(!started){requestAnimationFrame(loop);return}const dt=Math.min((ts-lastT)/1000,.05);lastT=ts;fc++;uP(dt);npcs.forEach(n=>n.update(dt));uD(dt);tryNPCChat(dt);updateGEVT(dt);uC();render();if(fc%15===0)dM();requestAnimationFrame(loop)}
+function loop(ts){if(!started){requestAnimationFrame(loop);return}const dt=Math.min((ts-lastT)/1000,.05);lastT=ts;fc++;uP(dt);if(ap.active&&player.mv)player.update(dt);npcs.forEach(n=>n.update(dt));uD(dt);tryNPCChat(dt);updateGEVT(dt);uC();render();if(fc%15===0)dM();requestAnimationFrame(loop)}
 function startGame(){document.getElementById('title-screen').style.display='none';initGame();started=true;lastT=performance.now()}
-requestAnimationFrame(loop);window.startGame=startGame;window.closeDialog=closeDialog;
+requestAnimationFrame(loop);window.startGame=startGame;window.closeDialog=closeDialog;window.closeMinigame=closeMinigame;
 </script>
 </body>
 </html>
