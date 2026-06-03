@@ -370,7 +370,31 @@ function saveFeed(){try{localStorage.setItem('lw_feed',JSON.stringify(feedData))
 function fmtT(){const d=new Date();return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')}
 function addFeed(type,html,noSave){const d=document.createElement('div');d.className='fm '+type;const ts=fmtT();d.innerHTML='<span class="ts">'+ts+'</span>'+html;feedBody.appendChild(d);while(feedBody.children.length>80)feedBody.removeChild(feedBody.firstChild);feedBody.scrollTop=feedBody.scrollHeight;if(!noSave){feedData.push({type,html,ts});while(feedData.length>80)feedData.shift();saveFeed()}}
 function loadSavedFeed(){feedData.forEach(m=>{const d=document.createElement('div');d.className='fm '+m.type;d.innerHTML='<span class="ts">'+m.ts+'</span>'+m.html;feedBody.appendChild(d)});feedBody.scrollTop=feedBody.scrollHeight}
-function feedChat(n1,txt){addFeed('chat','<span class="sp" style="color:'+npcClr(n1)+'">'+n1+'</span>：'+txt)}
+function feedChat(n1,txt){addFeed('chat','<span class="sp" style="color:'+npcClr(n1)+'">'+n1+'</span>：'+txt);addBubble(n1,txt)}
+
+// ==================== 聊天气泡 ====================
+let bubbles=[];
+function addBubble(name,text){const maxLen=18;let short=text.length>maxLen?text.slice(0,maxLen)+'...':text;
+  bubbles=bubbles.filter(b=>b.name!==name);bubbles.push({name,text:short,timer:4})}
+function updateBubbles(dt){for(let i=bubbles.length-1;i>=0;i--){bubbles[i].timer-=dt;if(bubbles[i].timer<=0)bubbles.splice(i,1)}}
+function drawBubbles(){bubbles.forEach(b=>{
+  let ch=null;if(b.name==='Alex'||b.name==='Alex CEO')ch=player;else ch=npcs.find(n=>n.name===b.name);
+  if(!ch)return;const p=ch.sp;const bx=p.x,by=p.y-72;
+  const alpha=b.timer<1?b.timer:1;
+  cx.save();cx.globalAlpha=alpha;
+  cx.font='bold 10px "PingFang SC"';cx.textAlign='center';const tw=cx.measureText(b.text).width;
+  const pw=Math.max(tw+16,36),ph=22,br=8;
+  // bubble body
+  cx.fillStyle='rgba(255,255,255,0.92)';cx.beginPath();
+  cx.moveTo(bx-pw/2+br,by-ph);cx.lineTo(bx+pw/2-br,by-ph);cx.quadraticCurveTo(bx+pw/2,by-ph,bx+pw/2,by-ph+br);
+  cx.lineTo(bx+pw/2,by-br);cx.quadraticCurveTo(bx+pw/2,by,bx+pw/2-br,by);
+  cx.lineTo(bx+4,by);cx.lineTo(bx,by+8);cx.lineTo(bx-4,by);
+  cx.lineTo(bx-pw/2+br,by);cx.quadraticCurveTo(bx-pw/2,by,bx-pw/2,by-br);
+  cx.lineTo(bx-pw/2,by-ph+br);cx.quadraticCurveTo(bx-pw/2,by-ph,bx-pw/2+br,by-ph);
+  cx.closePath();cx.fill();
+  // text
+  cx.fillStyle='#222';cx.textBaseline='middle';cx.fillText(b.text,bx,by-ph/2);
+  cx.restore()})}
 
 // ==================== NPC间对话 ====================
 let npcChatCD=15;
@@ -831,7 +855,7 @@ function genR(txt,npc){const p=NPC_P[npc.name];if(!p)return'...';let t='general'
   const rs=p.r[t]||p.r.general;return rs[Math.floor(Math.random()*rs.length)]}
 function openDlg(npc){dlgAct=true;actNPC=npc;document.getElementById('dialogBox').style.display='block';document.getElementById('npcDot').style.backgroundColor=npc.cl.body;document.getElementById('npcNameLabel').textContent=npc.name+' - '+npc.title;const h=document.getElementById('chatHistory');h.innerHTML='';aCM(npc.name,npc.greet(),'n');const qo=document.getElementById('quickOpts');qo.innerHTML='';['你好！','在忙什么？','聊聊AI产品？','再见！'].forEach(t=>{const d=document.createElement('div');d.className='quick-opt';d.textContent=t;d.addEventListener('click',()=>sMsg(t));qo.appendChild(d)});document.getElementById('chatInput').value='';document.getElementById('chatInput').focus()}
 function aCM(name,text,type){const h=document.getElementById('chatHistory');const d=document.createElement('div');d.className='chat-msg '+(type==='p'?'p':'n');d.innerHTML='<span class="s">'+name+'：</span>'+text;h.appendChild(d);h.scrollTop=h.scrollHeight}
-function sMsg(text){if(!text.trim()||!actNPC)return;aCM('Alex',text,'p');feedChat('Alex',text);setTimeout(()=>{const r=genR(text,actNPC);aCM(actNPC.name,r,'n');feedChat(actNPC.name,r)},300+Math.random()*500);document.getElementById('chatInput').value=''}
+function sMsg(text){if(!text.trim()||!actNPC)return;aCM('Alex',text,'p');feedChat('Alex',text);addBubble('Alex',text);setTimeout(()=>{const r=genR(text,actNPC);aCM(actNPC.name,r,'n');feedChat(actNPC.name,r)},300+Math.random()*500);document.getElementById('chatInput').value=''}
 document.addEventListener('DOMContentLoaded',()=>{document.getElementById('chatInput').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();sMsg(e.target.value)}})});
 function closeDialog(){dlgAct=false;actNPC=null;document.getElementById('dialogBox').style.display='none'}
 NPC.prototype.greet=function(){const p=NPC_P[this.name];if(p)return p.greet[Math.floor(Math.random()*p.greet.length)];return'你好！'};
@@ -878,13 +902,14 @@ function render(){cx.clearRect(0,0,cv.width,cv.height);const bg=cx.createLinearG
   drawDoors();
   // 5. player always on top
   player.draw();
+  drawBubbles();
   const prm=gra(player.col,player.row);
   if(prm==='ai_demo'&&!dlgAct){const pp=ts(player.col,player.row);cx.fillStyle='rgba(255,255,255,0.5)';cx.font='10px "PingFang SC"';cx.textAlign='center';cx.fillText('按空格选择游戏',pp.x,pp.y-40)}
   if(prm==='kitchen'&&!dlgAct){const pp=ts(player.col,player.row);cx.fillStyle='rgba(255,255,255,0.5)';cx.font='10px "PingFang SC"';cx.textAlign='center';cx.fillText('按空格开始烹饪',pp.x,pp.y-40)}
 }
 
 // ==================== 游戏循环 ====================
-function loop(ts){if(!started){requestAnimationFrame(loop);return}const dt=Math.min((ts-lastT)/1000,.05);lastT=ts;fc++;uP(dt);if(ap.active&&player.mv)player.update(dt);npcs.forEach(n=>n.update(dt));uD(dt);tryNPCChat(dt);updateGEVT(dt);uC();render();if(fc%15===0)dM();requestAnimationFrame(loop)}
+function loop(ts){if(!started){requestAnimationFrame(loop);return}const dt=Math.min((ts-lastT)/1000,.05);lastT=ts;fc++;uP(dt);if(ap.active&&player.mv)player.update(dt);npcs.forEach(n=>n.update(dt));uD(dt);tryNPCChat(dt);updateGEVT(dt);updateBubbles(dt);uC();render();if(fc%15===0)dM();requestAnimationFrame(loop)}
 function startGame(){document.getElementById('title-screen').style.display='none';initGame();started=true;lastT=performance.now()}
 requestAnimationFrame(loop);window.startGame=startGame;window.closeDialog=closeDialog;window.closeMinigame=closeMinigame;
 </script>
