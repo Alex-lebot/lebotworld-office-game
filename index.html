@@ -623,20 +623,100 @@ function showGameSelect(){
 // ==================== 打砖块 ====================
 function startBreakout(){
   const box=document.getElementById('mgContent');
-  const cvs=document.createElement('canvas');cvs.width=300;cvs.height=420;cvs.style.cssText='display:block;margin:0 auto;background:#1A1A2E;border:2px solid rgba(255,255,255,0.2);border-radius:8px';box.appendChild(cvs);
-  const c2=cvs.getContext('2d'),W=300,H=420;let padW=60,padX=W/2-30,ballX=W/2,ballY=H-28,bdx=1.5,bdy=-1.5,sc=0,lives=3,over=false,lbShown2=false;
-  const ROWS=6,COLS=8,BW=W/COLS,BH=15,clr=['#FF4444','#FF8844','#FFCC44','#44CC44','#4488FF','#AA44FF'];
-  let bks=[];for(let r=0;r<ROWS;r++)for(let cl=0;cl<COLS;cl++)bks.push({x:cl*BW+1,y:r*BH+35,w:BW-2,h:BH-2,a:true,c:clr[r]});
-  function draw(){c2.fillStyle='#1A1A2E';c2.fillRect(0,0,W,H);bks.forEach(b=>{if(b.a){c2.fillStyle=b.c;c2.fillRect(b.x,b.y,b.w,b.h)}});c2.fillStyle='#FFF';c2.fillRect(padX,H-14,padW,7);c2.fillStyle='#FFD700';c2.beginPath();c2.arc(ballX,ballY,5,0,Math.PI*2);c2.fill();c2.fillStyle='#FFF';c2.font='bold 14px Arial';c2.textAlign='left';c2.fillText('Score: '+sc,8,18);c2.textAlign='right';c2.fillText('❤'.repeat(lives),W-8,18);
-    if(over&&!lbShown2){lbShown2=true;addScore('breakout',sc);draw();setTimeout(()=>{closeMinigame();setTimeout(()=>{openMinigame('🏓 打砖块',()=>{showLeaderboard('breakout',sc)})},120)},800)}if(over){c2.fillStyle='rgba(0,0,0,0.7)';c2.fillRect(0,0,W,H);c2.fillStyle=lives<=0?'#FF4444':'#FFD700';c2.font='bold 24px Arial';c2.textAlign='center';c2.fillText(lives<=0?'GAME OVER':'YOU WIN!',W/2,H/2);c2.font='14px Arial';c2.fillStyle='#FFF';c2.fillText('Score: '+sc,W/2,H/2+30)}}
-  function upd(){if(over)return;ballX+=bdx;ballY+=bdy;if(ballX<=5||ballX>=W-5)bdx=-bdx;if(ballY<=5)bdy=-bdy;
-    if(ballY>=H-20&&ballX>=padX&&ballX<=padX+padW&&bdy>0){bdy=-bdy;bdx+=((ballX-(padX+padW/2))/(padW/2))*1;bdx=Math.max(-2.5,Math.min(2.5,bdx))}
-    if(ballY>H){lives--;if(lives<=0)over=true;else{ballX=W/2;ballY=H-28;bdx=1.5*(Math.random()>.5?1:-1);bdy=-1.5}}
-    bks.forEach(b=>{if(b.a&&ballX+5>b.x&&ballX-5<b.x+b.w&&ballY+5>b.y&&ballY-5<b.y+b.h){b.a=false;bdy=-bdy;sc+=10}});if(bks.every(b=>!b.a))over=true}
+  const cvs=document.createElement('canvas');cvs.width=600;cvs.height=840;cvs.style.cssText='display:block;margin:0 auto;background:#1A1A2E;border:2px solid rgba(255,255,255,0.2);border-radius:10px';
+  box.appendChild(cvs);
+  const c2=cvs.getContext('2d'),W=600,H=840,BALL_R=8;
+  let padW=100,padX=W/2-50,ballX=W/2,ballY=H-36,bdx=2,bdy=-2,sc=0,lives=3,over=false,lbShown2=false;
+  let level=1,bks=[],combo=0,particles=[];
+  const CLR=['#FF4444','#FF8844','#FFCC44','#44CC44','#4488FF','#AA44FF','#FF44AA','#44FFFF','#FFAA44','#44FF88'];
+  function makeLevel(lv){
+    bks=[];const rows=Math.min(4+Math.floor(lv/2),10),cols=Math.min(6+Math.floor(lv/3),12);
+    const bw=(W-20)/cols,bh=22;
+    for(let r=0;r<rows;r++)for(let cl=0;cl<cols;cl++){
+      const hp=lv>=5&&r<2?2:lv>=8&&r<3?3:1;
+      bks.push({x:cl*bw+10,y:r*bh+50,w:bw-3,h:bh-3,a:hp,c:CLR[r%CLR.length],maxHp:hp,pts:10*lv})}}
+  function resetBall(){ballX=W/2;ballY=H-36;const spd=2+level*0.3;const ang=Math.PI*0.3+Math.random()*Math.PI*0.4;bdx=spd*Math.cos(ang)*(Math.random()>.5?1:-1);bdy=-spd*Math.sin(ang);combo=0}
+  function spawnParticles(x,y,color,n){for(let i=0;i<n;i++)particles.push({x,y,vx:(Math.random()-.5)*6,vy:(Math.random()-.5)*6,life:1,color})}
+  makeLevel(1);resetBall();
+  function draw(){
+    c2.fillStyle='#0D0D1A';c2.fillRect(0,0,W,H);
+    // starfield bg
+    c2.fillStyle='rgba(255,255,255,0.03)';for(let i=0;i<30;i++){const sx=(i*137+level*53)%W,sy=(i*97+sc)%H;c2.fillRect(sx,sy,2,2)}
+    // bricks
+    bks.forEach(b=>{if(b.a<=0)return;
+      const alpha=b.a<b.maxHp?0.5+0.5*(b.a/b.maxHp):1;
+      c2.globalAlpha=alpha;
+      c2.fillStyle=b.c;c2.beginPath();c2.roundRect(b.x,b.y,b.w,b.h,3);c2.fill();
+      // highlight
+      c2.fillStyle='rgba(255,255,255,0.15)';c2.fillRect(b.x+2,b.y+1,b.w-4,b.h*0.35);
+      // hp indicator for multi-hp bricks
+      if(b.maxHp>1){c2.fillStyle='rgba(255,255,255,0.7)';c2.font='bold 10px Arial';c2.textAlign='center';c2.fillText(b.a,b.x+b.w/2,b.y+b.h/2+3)}
+      c2.globalAlpha=1});
+    // particles
+    particles.forEach(p=>{c2.globalAlpha=p.life;c2.fillStyle=p.color;c2.fillRect(p.x-2,p.y-2,4,4);c2.globalAlpha=1});
+    // paddle
+    const grad=c2.createLinearGradient(padX,H-18,padX+padW,H-18);grad.addColorStop(0,'#4A90D9');grad.addColorStop(1,'#357ABD');
+    c2.fillStyle=grad;c2.beginPath();c2.roundRect(padX,H-18,padW,12,6);c2.fill();
+    c2.fillStyle='rgba(255,255,255,0.3)';c2.fillRect(padX+4,H-17,padW-8,4);
+    // ball
+    c2.fillStyle='#FFD700';c2.shadowColor='#FFD700';c2.shadowBlur=12;c2.beginPath();c2.arc(ballX,ballY,BALL_R,0,Math.PI*2);c2.fill();
+    c2.shadowBlur=0;
+    // trail
+    c2.fillStyle='rgba(255,215,0,0.15)';c2.beginPath();c2.arc(ballX-bdx*2,ballY-bdy*2,BALL_R*0.8,0,Math.PI*2);c2.fill();
+    // HUD
+    c2.fillStyle='rgba(0,0,0,0.5)';c2.fillRect(0,0,W,42);
+    c2.fillStyle='#FFF';c2.font='bold 20px "PingFang SC"';c2.textAlign='left';c2.fillText('🏓 第 '+level+' 关',14,28);
+    c2.font='bold 18px Arial';c2.fillText('Score: '+sc,200,28);
+    c2.textAlign='right';c2.font='18px Arial';c2.fillStyle='#FF6666';
+    let hearts='';for(let i=0;i<lives;i++)hearts+='❤';c2.fillText(hearts,W-14,28);
+    // combo indicator
+    if(combo>=3){c2.fillStyle='#FFD700';c2.font='bold 14px Arial';c2.textAlign='center';c2.fillText('🔥 '+combo+'x COMBO!',W/2,28)}
+    // level transition
+    if(bks.every(b=>b.a<=0)&&!over){
+      level++;sc+=level*50;makeLevel(level);resetBall();
+      padW=Math.max(50,100-level*3);
+      c2.fillStyle='rgba(0,0,0,0.6)';c2.fillRect(0,0,W,H);
+      c2.fillStyle='#FFD700';c2.font='bold 32px Arial';c2.textAlign='center';c2.fillText('🎉 第 '+level+' 关!',W/2,H/2-10);
+      c2.fillStyle='rgba(255,255,255,0.6)';c2.font='16px "PingFang SC"';c2.fillText('砖块更多，球速更快！',W/2,H/2+25)}
+    // game over
+    if(over&&!lbShown2){lbShown2=true;addScore('breakout',sc);draw();setTimeout(()=>{closeMinigame();setTimeout(()=>{openMinigame('🏓 打砖块',()=>{showLeaderboard('breakout',sc)})},120)},1200)}
+    if(over){c2.fillStyle='rgba(0,0,0,0.75)';c2.fillRect(0,0,W,H);
+      c2.fillStyle='#FF4444';c2.font='bold 36px Arial';c2.textAlign='center';c2.fillText('GAME OVER',W/2,H/2-30);
+      c2.fillStyle='#FFF';c2.font='20px Arial';c2.fillText('Score: '+sc+'  |  最高关卡: '+level,W/2,H/2+10);
+      c2.fillStyle='rgba(255,255,255,0.4)';c2.font='14px "PingFang SC"';c2.fillText('关闭窗口重来',W/2,H/2+45)}}
+  function upd(){
+    if(over)return;
+    ballX+=bdx;ballY+=bdy;
+    if(ballX<=BALL_R||ballX>=W-BALL_R){bdx=-bdx;ballX=Math.max(BALL_R,Math.min(W-BALL_R,ballX))}
+    if(ballY<=BALL_R){bdy=-bdy;ballY=BALL_R}
+    // paddle bounce
+    if(bdy>0&&ballY+BALL_R>=H-20&&ballY+BALL_R<=H-6&&ballX>=padX-4&&ballX<=padX+padW+4){
+      bdy=-Math.abs(bdy);
+      const off=(ballX-(padX+padW/2))/(padW/2);
+      bdx+=off*2;const spd=Math.sqrt(bdx*bdx+bdy*bdy);const maxSpd=3+level*0.3;
+      bdx=Math.max(-maxSpd,Math.min(maxSpd,bdx));
+      ballY=H-20-BALL_R;combo=0}
+    // ball lost
+    if(ballY>H+20){lives--;combo=0;if(lives<=0){over=true}else{resetBall()}}
+    // brick collision
+    for(let i=bks.length-1;i>=0;i--){const b=bks[i];if(b.a<=0)continue;
+      if(ballX+BALL_R>b.x&&ballX-BALL_R<b.x+b.w&&ballY+BALL_R>b.y&&ballY-BALL_R<b.y+b.h){
+        b.a--;combo++;
+        const cb=10*level*(1+Math.floor(combo/3)*0.5);sc+=Math.round(cb);
+        spawnParticles(ballX,ballY,b.c,b.a<=0?8:3);
+        // bounce direction
+        const overlapL=ballX+BALL_R-b.x,overlapR=b.x+b.w-(ballX-BALL_R);
+        const overlapT=ballY+BALL_R-b.y,overlapB=b.y+b.h-(ballY-BALL_R);
+        const minX=Math.min(overlapL,overlapR),minY=Math.min(overlapT,overlapB);
+        if(minX<minY)bdx=-bdx;else bdy=-bdy;
+        break}}
+    // update particles
+    for(let i=particles.length-1;i>=0;i--){const p=particles[i];p.x+=p.vx;p.y+=p.vy;p.vy+=0.15;p.life-=0.03;if(p.life<=0)particles.splice(i,1)}}
   function tick(){if(!mgActive){draw();return}upd();draw();requestAnimationFrame(tick)}
-  function onK(e){if(over||!mgActive)return;if(e.key==='ArrowLeft'){padX=Math.max(0,padX-25);e.preventDefault()}else if(e.key==='ArrowRight'){padX=Math.min(W-padW,padX+25);e.preventDefault()}}
+  function onK(e){if(over||!mgActive)return;if(e.key==='ArrowLeft'){padX=Math.max(0,padX-30);e.preventDefault()}else if(e.key==='ArrowRight'){padX=Math.min(W-padW,padX+30);e.preventDefault()}}
   document.addEventListener('keydown',onK);const oc=closeMinigame;closeMinigame=function(){document.removeEventListener('keydown',onK);oc()};
   draw();requestAnimationFrame(tick)}
+
 
 // ==================== 贪吃蛇 ====================
 function startSnake(){
