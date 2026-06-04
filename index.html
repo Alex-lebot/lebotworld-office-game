@@ -621,16 +621,19 @@ function startPacman(){
     m[gh1][gw1-1]=WALL;m[gh1][gw2+1]=WALL;m[gh2][gw1-1]=WALL;m[gh2][gw2+1]=WALL;
     // power pellets in corners
     m[1][1]=POWER;m[1][COLS-2]=POWER;m[ROWS-2][1]=POWER;m[ROWS-2][COLS-2]=POWER;
-    // ensure connectivity — flood fill from (1,1) and open unreachable dots
+    // ensure connectivity — flood fill from start pos (pac-man can't pass GATE)
     const visited=Array.from({length:ROWS},()=>Array(COLS).fill(false));
-    const q=[{r:1,c:1}];visited[1][1]=true;
+    const sr=ROWS-4,sc=CX;
+    const q=[{r:sr,c:sc}];if(m[sr][sc]===WALL)m[sr][sc]=DOT;visited[sr][sc]=true;
     while(q.length){const{r:cr,c:cc}=q.shift();
       for(const[dr,dc]of[[-1,0],[1,0],[0,-1],[0,1]]){
         const nr=cr+dr,nc=cc+dc;
-        if(nr>=0&&nr<ROWS&&nc>=0&&nc<COLS&&!visited[nr][nc]&&m[nr][nc]!==WALL){
+        if(nr>=0&&nr<ROWS&&nc>=0&&nc<COLS&&!visited[nr][nc]&&m[nr][nc]!==WALL&&m[nr][nc]!==GATE){
           visited[nr][nc]=true;q.push({r:nr,c:nc})}}}
-    // open unreachable areas
+    // open unreachable areas + ensure start pos clear
     for(let r=1;r<ROWS-1;r++)for(let c=1;c<COLS-1;c++){
+      if(r===ROWS-4&&c===CX){if(m[r][c]===WALL||m[r][c]===GATE)m[r][c]=DOT;continue}
+      if((Math.abs(r-(ROWS-4))<=1&&Math.abs(c-CX)<=1)&&(m[r][c]===WALL))m[r][c]=DOT;
       if(m[r][c]===WALL){
         let adj=0;for(const[dr,dc]of[[-1,0],[1,0],[0,-1],[0,1]]){
           const nr=r+dr,nc=c+dc;
@@ -673,7 +676,7 @@ function startPacman(){
     for(let d=1;d<Math.max(ROWS,COLS);d++){
       for(let dr=-d;dr<=d;dr++)for(let dc=-d;dc<=d;dc++){
         const nr=r+dr,nc=c+dc;
-        if(nr>0&&nr<ROWS-1&&nc>0&&nc<COLS-1&&maze[nr][nc]!==WALL&&maze[nr][nc]!==GATE){px=nc;py=nr;return}
+        if(nr>0&&nr<ROWS-1&&nc>0&&nc<COLS-1&&maze[nr][nc]!==WALL&&maze[nr][nc]!==GATE){px=nc;py=nr;pdx=0;pdy=0;return}
       }
     }
   }
@@ -775,9 +778,9 @@ function startPacman(){
   function updatePacman(){
     // try queued direction first
     if(ndx!==0||ndy!==0){
-      if(canMovePU(px+ndx,py+ndy)){pdx=ndx;pdy=ndy}
+      if(canMovePU(px+ndx,py+ndy)){pdx=ndx;pdy=ndy;ndx=0;ndy=0}
     }
-    if(!canMovePU(px+pdx,py+pdy))return;
+    if(!canMovePU(px+pdx,py+pdy)){pdx=0;pdy=0;return}
     px+=pdx;py+=pdy;
     // eat dot
     const c=Math.round(px),r=Math.round(py);
