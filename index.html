@@ -523,27 +523,58 @@ function openMinigame(title,contentFn){mgActive=true;document.getElementById('mg
 // ==================== 俄罗斯方块 ====================
 function startTetris(){
   const box=document.getElementById('mgContent');
-  const cvs=document.createElement('canvas');cvs.width=250;cvs.height=500;cvs.style.display='block';cvs.style.margin='0 auto';cvs.style.background='#1A1A2E';cvs.style.border='2px solid rgba(255,255,255,0.2)';cvs.style.borderRadius='8px';box.appendChild(cvs);
+  const cvs=document.createElement('canvas');cvs.width=500;cvs.height=1000;cvs.style.cssText='display:block;margin:0 auto;background:#1A1A2E;border:2px solid rgba(255,255,255,0.2);border-radius:10px';box.appendChild(cvs);
   const tc=cvs.getContext('2d');
-  const COLS=10,ROWS=20,SZ=25;
+  const COLS=10,ROWS=20,SZ=50;
   const SHAPES=[[[1,1,1,1]],[[1,1],[1,1]],[[0,1,0],[1,1,1]],[[1,0,0],[1,1,1]],[[0,0,1],[1,1,1]],[[1,1,0],[0,1,1]],[[0,1,1],[1,1,0]]];
   const COLORS=['#00F0F0','#F0F000','#A000F0','#0000F0','#F0A000','#00F000','#F00000'];
+  const GLOW=['rgba(0,240,240,0.3)','rgba(240,240,0,0.3)','rgba(160,0,240,0.3)','rgba(0,0,240,0.3)','rgba(240,160,0,0.3)','rgba(0,240,0,0.3)','rgba(240,0,0,0.3)'];
   let board=Array.from({length:ROWS},()=>Array(COLS).fill(0));
-  let cur,cx2,cy2,ci,score=0,over=false,dropT=0,dropI=500,lbShown=false;
+  let cur,cx2,cy2,ci,score=0,over=false,dropT=0,dropI=500,lbShown=false,lines=0,level=1;
   function newPiece(){ci=Math.floor(Math.random()*SHAPES.length);cur=SHAPES[ci].map(r=>[...r]);cx2=Math.floor((COLS-cur[0].length)/2);cy2=0;if(collides(cx2,cy2,cur)){over=true}}
   function collides(px,py,sh){for(let r=0;r<sh.length;r++)for(let c=0;c<sh[r].length;c++){if(!sh[r][c])continue;const nx=px+c,ny=py+r;if(nx<0||nx>=COLS||ny>=ROWS)return true;if(ny>=0&&board[ny][nx])return true}return false}
   function merge(){for(let r=0;r<cur.length;r++)for(let c=0;c<cur[r].length;c++){if(cur[r][c]&&cy2+r>=0)board[cy2+r][cx2+c]=ci+1}}
-  function clearLines(){let cl=0;for(let r=ROWS-1;r>=0;r--){if(board[r].every(v=>v)){board.splice(r,1);board.unshift(Array(COLS).fill(0));cl++;r++}}if(cl){score+=cl*100;dropI=Math.max(100,dropI-cl*20)}}
-  function rotate(){const rot=cur[0].map((_,c)=>cur.map(r=>r[c]).reverse());if(!collides(cx2,cy2,rot))cur=rot}
-  function drawT(){tc.fillStyle='#1A1A2E';tc.fillRect(0,0,cvs.width,cvs.height);for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){if(board[r][c]){tc.fillStyle=COLORS[board[r][c]-1];tc.fillRect(c*SZ+1,r*SZ+1,SZ-2,SZ-2)}else{tc.fillStyle='rgba(255,255,255,0.03)';tc.fillRect(c*SZ+1,r*SZ+1,SZ-2,SZ-2)}}if(cur&&!over){tc.fillStyle=COLORS[ci];for(let r=0;r<cur.length;r++)for(let c=0;c<cur[r].length;c++){if(cur[r][c])tc.fillRect((cx2+c)*SZ+1,(cy2+r)*SZ+1,SZ-2,SZ-2)}}tc.fillStyle='#FFF';tc.font='bold 16px Arial';tc.textAlign='left';tc.fillText('Score: '+score,8,20);if(over&&!lbShown){lbShown=true;addScore('tetris',score);drawT();setTimeout(()=>{closeMinigame();setTimeout(()=>{openMinigame('🧱 俄罗斯方块',()=>{showLeaderboard('tetris',score)})},120)},800)}if(over){tc.fillStyle='rgba(0,0,0,0.7)';tc.fillRect(0,0,cvs.width,cvs.height);tc.fillStyle='#FF4444';tc.font='bold 28px Arial';tc.textAlign='center';tc.fillText('GAME OVER',cvs.width/2,cvs.height/2);tc.font='16px Arial';tc.fillStyle='#FFF';tc.fillText('Score: '+score,cvs.width/2,cvs.height/2+30)}}
+  function clearLines(){let cl=0;for(let r=ROWS-1;r>=0;r--){if(board[r].every(v=>v)){board.splice(r,1);board.unshift(Array(COLS).fill(0));cl++;r++}}if(cl){lines+=cl;level=Math.floor(lines/10)+1;score+=cl*100*level;dropI=Math.max(80,500-level*30)}}
+  function ghostY(){let gy=cy2;while(!collides(cx2,gy+1,cur))gy++;return gy}
+  function rotate(){const rot=cur[0].map((_,c)=>cur.map(r=>r[c]).reverse());if(!collides(cx2,cy2,rot))cur=rot;else if(!collides(cx2-1,cy2,rot)){cx2--;cur=rot}else if(!collides(cx2+1,cy2,rot)){cx2++;cur=rot}}
+  function drawBlock(x,y,ci2,isGhost){
+    const px=x*SZ,py=y*SZ;
+    if(isGhost){tc.fillStyle='rgba(255,255,255,0.08)';tc.fillRect(px+2,py+2,SZ-4,SZ-4);tc.strokeStyle='rgba(255,255,255,0.15)';tc.lineWidth=1;tc.strokeRect(px+2,py+2,SZ-4,SZ-4);return}
+    tc.fillStyle=COLORS[ci2];tc.beginPath();tc.roundRect(px+2,py+2,SZ-4,SZ-4,4);tc.fill();
+    tc.fillStyle='rgba(255,255,255,0.2)';tc.fillRect(px+4,py+4,SZ-8,SZ*0.3);
+    tc.fillStyle='rgba(0,0,0,0.15)';tc.fillRect(px+4,py+SZ-8,SZ-8,4)}
+  function drawT(){
+    tc.fillStyle='#0D0D1A';tc.fillRect(0,0,cvs.width,cvs.height);
+    // grid
+    for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+      if(board[r][c]){drawBlock(c,r,board[r][c]-1,false)}
+      else{tc.fillStyle='rgba(255,255,255,0.02)';tc.fillRect(c*SZ+1,r*SZ+1,SZ-2,SZ-2)}}
+    // ghost piece
+    if(cur&&!over){const gy=ghostY();for(let r=0;r<cur.length;r++)for(let c=0;c<cur[r].length;c++){if(cur[r][c]&&gy+r>=0)drawBlock(cx2+c,gy+r,ci,true)}}
+    // current piece
+    if(cur&&!over){for(let r=0;r<cur.length;r++)for(let c=0;c<cur[r].length;c++){if(cur[r][c]&&cy2+r>=0)drawBlock(cx2+c,cy2+r,ci,false)}}
+    // HUD
+    tc.fillStyle='rgba(0,0,0,0.5)';tc.fillRect(0,0,cvs.width,50);
+    tc.fillStyle='#FFF';tc.font='bold 20px Arial';tc.textAlign='left';tc.fillText('Score: '+score,12,32);
+    tc.textAlign='center';tc.fillText('Lv.'+level,cvs.width/2,32);
+    tc.textAlign='right';tc.fillText('Lines: '+lines,cvs.width-12,32);
+    // next piece preview
+    if(cur&&!over){
+      tc.fillStyle='rgba(255,255,255,0.06)';tc.fillRect(cvs.width-130,60,120,100);
+      tc.fillStyle='rgba(255,255,255,0.3)';tc.font='12px Arial';tc.textAlign='center';tc.fillText('NEXT',cvs.width-70,78);
+      const nci=(ci+1)%SHAPES.length;const nsh=SHAPES[nci];const nw=nsh[0].length;
+      for(let r=0;r<nsh.length;r++)for(let c=0;c<nsh[r].length;c++){
+        if(nsh[r][c]){tc.fillStyle=COLORS[nci];tc.fillRect(cvs.width-130+(c+(4-nw)/2)*28+4,84+r*28+4,24,24)}}}
+    if(over&&!lbShown){lbShown=true;addScore('tetris',score);drawT();setTimeout(()=>{closeMinigame();setTimeout(()=>{openMinigame('🧱 俄罗斯方块',()=>{showLeaderboard('tetris',score)})},120)},1200)}
+    if(over){tc.fillStyle='rgba(0,0,0,0.75)';tc.fillRect(0,0,cvs.width,cvs.height);tc.fillStyle='#FF4444';tc.font='bold 36px Arial';tc.textAlign='center';tc.fillText('GAME OVER',cvs.width/2,cvs.height/2-20);tc.fillStyle='#FFF';tc.font='20px Arial';tc.fillText('Score: '+score+'  |  Level: '+level,cvs.width/2,cvs.height/2+20)}}
   function tick(ts2){if(over||!mgActive){drawT();return}dropT+=16;if(dropT>dropI){dropT=0;if(!collides(cx2,cy2+1,cur)){cy2++}else{merge();clearLines();newPiece()}}drawT();requestAnimationFrame(tick)}
-  function onKey(e){if(over||!mgActive)return;const k=e.key;if(k==='ArrowLeft'){if(!collides(cx2-1,cy2,cur))cx2--}else if(k==='ArrowRight'){if(!collides(cx2+1,cy2,cur))cx2++}else if(k==='ArrowDown'){if(!collides(cx2,cy2+1,cur)){cy2++;score+=1}}else if(k==='ArrowUp'){rotate()}else return;e.preventDefault()}
+  function onKey(e){if(over||!mgActive)return;const k=e.key;if(k==='ArrowLeft'){if(!collides(cx2-1,cy2,cur))cx2--}else if(k==='ArrowRight'){if(!collides(cx2+1,cy2,cur))cx2++}else if(k==='ArrowDown'){if(!collides(cx2,cy2+1,cur)){cy2++;score+=1}}else if(k==='ArrowUp'){rotate()}else if(k===' '){e.preventDefault();while(!collides(cx2,cy2+1,cur)){cy2++;score+=2}merge();clearLines();newPiece()}else return;e.preventDefault()}
   document.addEventListener('keydown',onKey);
   newPiece();requestAnimationFrame(tick);
-  // cleanup on close
   const origClose=closeMinigame;
   closeMinigame=function(){document.removeEventListener('keydown',onKey);origClose()}
 }
+
 
 // ==================== 餐厅小游戏 ====================
 const INGREDIENTS=[
