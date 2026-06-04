@@ -44,6 +44,15 @@ body{background:#2C2C3A;overflow:hidden;font-family:'Segoe UI','PingFang SC','Mi
 .feed-in input:focus{border-color:rgba(74,144,217,0.5)}
 .feed-in input::placeholder{color:rgba(255,255,255,0.3)}
 @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.char-card{width:120px;padding:14px 10px;border-radius:14px;background:rgba(255,255,255,0.06);border:2px solid rgba(255,255,255,0.1);cursor:pointer;text-align:center;transition:all .2s;position:relative;overflow:hidden}
+.char-card:hover{transform:translateY(-4px);box-shadow:0 8px 24px rgba(0,0,0,0.3)}
+.char-card.selected{border-color:#4A90D9;background:rgba(74,144,217,0.15);box-shadow:0 0 20px rgba(74,144,217,0.3)}
+.char-card .avatar{width:56px;height:56px;border-radius:50%;margin:0 auto 8px;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;color:#fff;border:3px solid rgba(255,255,255,0.2)}
+.char-card .cname{color:#fff;font-size:14px;font-weight:700;margin-bottom:2px}
+.char-card .ctitle{color:rgba(255,255,255,0.5);font-size:10px}
+.start-btn2{margin-top:18px;background:linear-gradient(135deg,#4A90D9,#357ABD);color:#fff;border:none;padding:14px 48px;font-size:18px;border-radius:30px;cursor:pointer;transition:all .2s;font-weight:600;opacity:0.4;pointer-events:none}
+.start-btn2.ready{opacity:1;pointer-events:auto}
+.start-btn2.ready:hover{transform:scale(1.05);box-shadow:0 6px 24px rgba(74,144,217,0.4)}
 #title-screen{position:fixed;inset:0;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;background:linear-gradient(135deg,#1a1a2e 0%,#2C2C3A 50%,#1a1a2e 100%)}
 #title-screen h1{font-size:48px;color:#fff;margin-bottom:8px;text-shadow:0 4px 20px rgba(74,144,217,0.4)}
 #title-screen .subtitle{font-size:16px;color:rgba(255,255,255,0.5);margin-bottom:36px}
@@ -61,8 +70,8 @@ body{background:#2C2C3A;overflow:hidden;font-family:'Segoe UI','PingFang SC','Mi
 <div id="title-screen">
   <h1>LebotWorld 办公室</h1>
   <div class="subtitle">让每个孩子成为AI时代的原住民</div>
-  <button class="start-btn" onclick="startGame()">开始游戏</button>
-  <div style="margin-top:36px;color:rgba(255,255,255,0.35);font-size:13px">WASD/方向键：移动 | 空格/点击NPC：对话</div>
+  <div id="char-select" style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin:28px auto;max-width:680px"></div>
+  <div style="margin-top:24px;color:rgba(255,255,255,0.35);font-size:13px">WASD/方向键：移动 | 空格/点击NPC：对话</div>
 </div>
 <canvas id="gameCanvas"></canvas>
 <div id="hud"><div class="room-name" id="roomLabel">走廊</div></div>
@@ -153,7 +162,14 @@ const NPC_P={
     bye:['👋 拜～我得回去调电路板了～','回见！烙铁还热着呢！ 🔧'],
     general:['⚙️ 这个电机的扭矩不太够，需要换个大号的','PCB板Layout完了，准备发工厂打样 📐','🖨️ 3D打印的精度还可以再提高','硬件开源方案对教育场景很有价值 🎁','🔋 锂电池的续航方案需要重新评估']}}
 };
-const PC={body:'#4A90D9',dark:'#3068B0',light:'#70B0E8'};
+const ALL_CHARS=[
+  {body:'#4A90D9',dark:'#3068B0',light:'#70B0E8',name:'Alex',title:'CEO',icon:'👔'},
+  {body:'#D94A4A',dark:'#B03030',light:'#E87070',name:'鸽子',title:'产品经理',icon:'🎯'},
+  {body:'#4AAD5A',dark:'#308040',light:'#70C880',name:'周周',title:'博士',icon:'🔬'},
+  {body:'#D9A34A',dark:'#B08030',light:'#E8C070',name:'Evan',title:'全栈工程师',icon:'💻'},
+  {body:'#9B4AD9',dark:'#7030A8',light:'#B870E0',name:'KK',title:'硬件工程师',icon:'🔧'},
+];
+let selectedChar=-1,PC={body:'#4A90D9',dark:'#3068B0',light:'#70B0E8'};
 
 // ==================== 地图 ====================
 const RM=[],WK=[],FM=[];
@@ -353,7 +369,8 @@ class Ch{
 // ==================== NPC ====================
 const NDEST={working:[{col:6,row:3},{col:8,row:3},{col:10,row:3},{col:7,row:7},{col:10,row:7}],testing:[{col:2,row:13},{col:4,row:13},{col:6,row:13}],lab_work:[{col:14,row:3},{col:15,row:5},{col:17,row:7}],kitchen:[{col:10,row:14},{col:12,row:14},{col:14,row:15}],course_dev:[{col:17,row:12},{col:18,row:12},{col:16,row:15}],meeting_state:[{col:0,row:4},{col:4,row:4},{col:2,row:7}],idle:[{col:10,row:10.5},{col:3,row:10.5},{col:15,row:11}]};
 function npcClr(name){const d=ND.find(n=>n.name===name);return d?d.body:'#FFF'}
-function pickR(name,topic){const p=NPC_P[name];if(!p)return'...';const rs=p.r[topic]||p.r.general;return rs[Math.floor(Math.random()*rs.length)]}
+function pickR(name,topic){const p=NPC_P[name];if(!p)return'...';const rs=p.r[topic]||p.r.general;return subName(rs[Math.floor(Math.random()*rs.length)])}
+function subName(t){if(!player)return t;return t.replace(/Alex CEO/g,player.name+' CEO').replace(/Alex(?! CEO)/g,player.name)}
 function roomTopic(rm){return{office:'work',meeting:'meeting',kitchen:'food',ai_demo:'agent',robot_lab:'robot',course_dev:'course',corridor:'general'}[rm]||'general'}
 class NPC extends Ch{
   constructor(col,row,cl,name,title,idx){super(col,row,cl,name,false);this.title=title;this.idx=idx;this.state='idle';this.st=0;this.nat=5+Math.random()*5;this.wps=[];this.wi=0;this.inEvt=false}
@@ -403,8 +420,8 @@ function tryNPCChat(dt){if(GEVT.active)return;npcChatCD-=dt;if(npcChatCD>0)retur
 // ==================== 玩家自动巡航 ====================
 const ap={active:false,lastInput:0,state:'idle',wps:[],wi:0,st:0,nat:15};
 const AP_LABELS={idle:'在走廊溜达',working:'去办公区工作',testing:'去娱乐室玩音乐',lab_work:'去机器人实验室看看',kitchen:'去餐厅找吃的',course_dev:'去储藏室看看',meeting_state:'去会议室坐坐'};
-function activateAP(){ap.active=true;ap.state='idle';ap.st=0;addFeed('autopilot','Alex CEO 暂时离开了，开始自由活动...');chooseAPTgt()}
-function chooseAPTgt(){const sts=['idle','working','testing','lab_work','kitchen','course_dev','meeting_state'];const ws=[15,20,15,15,10,10,15],tot=ws.reduce((a,b)=>a+b,0);let r=Math.random()*tot,ch='idle';for(let i=0;i<sts.length;i++){r-=ws[i];if(r<=0){ch=sts[i];break}}ap.state=ch;ap.st=0;ap.nat=15+Math.random()*20;const ds=NDEST[ch]||NDEST.idle,tgt=ds[Math.floor(Math.random()*ds.length)];const fr=gra(player.col,player.row),trr=gra(tgt.col,tgt.row);ap.wps=cwp(player.col,fr,tgt.col,tgt.row,trr);ap.wi=0;addFeed('autopilot','Alex CEO 正在'+AP_LABELS[ch]+'...')}
+function activateAP(){ap.active=true;ap.state='idle';ap.st=0;addFeed('autopilot',player.name+' 暂时离开了，开始自由活动...');chooseAPTgt()}
+function chooseAPTgt(){const sts=['idle','working','testing','lab_work','kitchen','course_dev','meeting_state'];const ws=[15,20,15,15,10,10,15],tot=ws.reduce((a,b)=>a+b,0);let r=Math.random()*tot,ch='idle';for(let i=0;i<sts.length;i++){r-=ws[i];if(r<=0){ch=sts[i];break}}ap.state=ch;ap.st=0;ap.nat=15+Math.random()*20;const ds=NDEST[ch]||NDEST.idle,tgt=ds[Math.floor(Math.random()*ds.length)];const fr=gra(player.col,player.row),trr=gra(tgt.col,tgt.row);ap.wps=cwp(player.col,fr,tgt.col,tgt.row,trr);ap.wi=0;addFeed('autopilot',player.name+' 正在'+AP_LABELS[ch]+'...')}
 function updateAP(dt){if(!player.mv&&ap.wi<ap.wps.length){const w=ap.wps[ap.wi];player.tc=w.col;player.tr=w.row;player.mv=true;ap.wi++}if(!player.mv&&ap.wi>=ap.wps.length){ap.st+=dt;if(ap.st>ap.nat)chooseAPTgt()}for(const[id,d]of Object.entries(DD)){const cc=dcx(d);if(Math.sqrt((player.col-cc)**2+(player.row-d.y)**2)<2&&!d.open)d.open=true}}
 
 // ==================== 随机事件 ====================
@@ -426,7 +443,7 @@ let mgActive=false;
 const ROOM_KW={'会议室':'meeting','会议':'meeting','办公':'office','办公区':'office','餐厅':'kitchen','吃饭':'kitchen','饭':'kitchen','娱乐':'ai_demo','娱乐室':'ai_demo','实验':'robot_lab','研发':'robot_lab','研发室':'robot_lab','机器人':'robot_lab','储藏':'course_dev','储藏室':'course_dev','走廊':'corridor'};
 function sendFeedMsg(text){
   if(!text.trim())return;
-  addFeed('alex','<span class="sp" style="color:#88CCFF">Alex CEO</span>：'+text);
+  addFeed('alex','<span class="sp" style="color:'+PC.body+'">' +player.name+'</span>：'+text);
   // find room keyword for movement
   let targetRoom=null;
   for(const[kw,rm]of Object.entries(ROOM_KW)){if(text.includes(kw)){targetRoom=rm;break}}
@@ -853,20 +870,43 @@ function startCooking(){
     const btn=document.createElement('button');btn.style.cssText='margin-top:14px;padding:8px 28px;font-size:14px;border:none;border-radius:16px;cursor:pointer;color:#fff;background:linear-gradient(135deg,#4A90D9,#357ABD)';btn.textContent='再来一次';btn.onclick=phase1;card.appendChild(btn);box.appendChild(card)}
   phase1()}
 
+// ==================== 角色选择 ====================
+document.addEventListener('DOMContentLoaded',()=>{
+  const sel=document.getElementById('char-select');
+  if(!sel)return;
+  ALL_CHARS.forEach((ch,i)=>{
+    const card=document.createElement('div');card.className='char-card';
+    card.innerHTML='<div class="avatar" style="background:'+ch.body+'">'+ch.icon+'</div><div class="cname">'+ch.name+'</div><div class="ctitle">'+ch.title+'</div>';
+    card.onclick=()=>{
+      sel.querySelectorAll('.char-card').forEach(c=>c.classList.remove('selected'));
+      card.classList.add('selected');selectedChar=i;
+      document.getElementById('startBtn').classList.add('ready')};
+    sel.appendChild(card)});
+  const btn=document.createElement('button');btn.id='startBtn';btn.className='start-btn2';btn.textContent='进入办公室';
+  btn.onclick=()=>{
+    if(selectedChar<0)return;
+    PC={body:ALL_CHARS[selectedChar].body,dark:ALL_CHARS[selectedChar].dark,light:ALL_CHARS[selectedChar].light};
+    document.getElementById('title-screen').style.display='none';started=true;lastT=performance.now()};
+  sel.parentNode.insertBefore(btn,sel.nextSibling)});
+
 // ==================== 游戏状态 ====================
 let player,npcs=[],started=false,dlgAct=false,actNPC=null,keys={},lastT=0,fc=0;
 function initGame(){
-  player=new Ch(10,10.5,PC,'Alex',true);
+  const ci=selectedChar>=0?selectedChar:0;
+  const pc=ALL_CHARS[ci];PC={body:pc.body,dark:pc.dark,light:pc.light};
+  player=new Ch(10,10.5,PC,pc.name,true);
   const starts=[{col:6,row:3},{col:8,row:3},{col:7,row:7},{col:10,row:7}];
-  npcs=starts.map((s,i)=>{const d=ND[i];return new NPC(s.col,s.row,{body:d.body,dark:d.dark,light:d.light},d.name,d.title,i)});
+  npcs=[];let si=0;
+  ALL_CHARS.forEach((ch,i)=>{if(i===ci)return;const s=starts[si];si++;
+    npcs.push(new NPC(s.col,s.row,{body:ch.body,dark:ch.dark,light:ch.light},ch.name,ch.title,npcs.length))});
   DD.meeting_corridor.open=true;DD.meeting_corridor.anim=1;DD.robot_lab_corridor.open=true;DD.robot_lab_corridor.anim=1;
   ap.lastInput=performance.now();
-  if(feedData.length>0){loadSavedFeed();addFeed('event','<b>Alex CEO</b> 回到了 <b>LebotWorld</b>！')}
-  else{addFeed('event','欢迎 <b>Alex CEO</b> 来到 <b>LebotWorld</b>！让每个孩子成为AI时代的原住民！')}
+  if(feedData.length>0){loadSavedFeed();addFeed('event','<b>'+pc.name+'</b> 回到了 <b>LebotWorld</b>！')}
+  else{addFeed('event','欢迎 <b>'+pc.name+'</b> 来到 <b>LebotWorld</b>！让每个孩子成为AI时代的原住民！')}
 }
 
 // ==================== 输入 ====================
-function breakAP(){ap.lastInput=performance.now();if(ap.active){ap.active=false;player.mv=false;addFeed('autopilot','Alex CEO 回来了！')}}
+function breakAP(){ap.lastInput=performance.now();if(ap.active){ap.active=false;player.mv=false;addFeed('autopilot',player.name+' 回来了！')}}
 document.addEventListener('keydown',e=>{
   if(mgActive){return}
   keys[e.key.toLowerCase()]=true;breakAP();
@@ -901,7 +941,7 @@ function genR(txt,npc){const p=NPC_P[npc.name];if(!p)return'...';let t='general'
   const rs=p.r[t]||p.r.general;return rs[Math.floor(Math.random()*rs.length)]}
 function openDlg(npc){dlgAct=true;actNPC=npc;document.getElementById('dialogBox').style.display='block';document.getElementById('npcDot').style.backgroundColor=npc.cl.body;document.getElementById('npcNameLabel').textContent=npc.name+' - '+npc.title;const h=document.getElementById('chatHistory');h.innerHTML='';aCM(npc.name,npc.greet(),'n');const qo=document.getElementById('quickOpts');qo.innerHTML='';['你好！','在忙什么？','聊聊AI产品？','再见！'].forEach(t=>{const d=document.createElement('div');d.className='quick-opt';d.textContent=t;d.addEventListener('click',()=>sMsg(t));qo.appendChild(d)});document.getElementById('chatInput').value='';document.getElementById('chatInput').focus()}
 function aCM(name,text,type){const h=document.getElementById('chatHistory');const d=document.createElement('div');d.className='chat-msg '+(type==='p'?'p':'n');d.innerHTML='<span class="s">'+name+'：</span>'+text;h.appendChild(d);h.scrollTop=h.scrollHeight}
-function sMsg(text){if(!text.trim()||!actNPC)return;aCM('Alex',text,'p');feedChat('Alex',text);addBubble('Alex',text);setTimeout(()=>{const r=genR(text,actNPC);aCM(actNPC.name,r,'n');feedChat(actNPC.name,r)},300+Math.random()*500);document.getElementById('chatInput').value=''}
+function sMsg(text){if(!text.trim()||!actNPC)return;aCM(player.name,text,'p');feedChat(player.name,text);addBubble(player.name,text);setTimeout(()=>{const r=genR(text,actNPC);aCM(actNPC.name,r,'n');feedChat(actNPC.name,r)},300+Math.random()*500);document.getElementById('chatInput').value=''}
 document.addEventListener('DOMContentLoaded',()=>{document.getElementById('chatInput').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();sMsg(e.target.value)}})});
 function closeDialog(){dlgAct=false;actNPC=null;document.getElementById('dialogBox').style.display='none'}
 NPC.prototype.greet=function(){const p=NPC_P[this.name];if(p)return p.greet[Math.floor(Math.random()*p.greet.length)];return'你好！'};
