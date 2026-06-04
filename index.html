@@ -1214,19 +1214,19 @@ function startBreakout(){
 function startSnake(){
   const box=document.getElementById('mgContent');
   const wrap=document.createElement('div');wrap.style.cssText='display:flex;gap:12px;justify-content:center;align-items:flex-start';
-  const cvs=document.createElement('canvas');cvs.width=1400;cvs.height=1400;const scale=Math.min(1,(innerHeight*0.82)/1400);cvs.style.cssText='display:block;background:#0D0D1A;border:2px solid rgba(255,255,255,0.15);border-radius:10px;transform:scale('+scale+');transform-origin:top center';
+  const cvs=document.createElement('canvas');cvs.width=2800;cvs.height=2800;const scale=Math.min(1,(innerHeight-60)/2800);cvs.style.cssText='display:block;background:#0D0D1A;border:2px solid rgba(255,255,255,0.15);border-radius:10px;transform:scale('+scale+');transform-origin:top center';
   wrap.appendChild(cvs);
-  const lbDiv=document.createElement('div');lbDiv.id='sideLB3';lbDiv.style.cssText='width:180px;background:rgba(20,20,35,0.95);border:1px solid rgba(255,255,255,0.12);border-radius:10px;padding:10px;max-height:600px;overflow-y:auto;flex-shrink:0';
+  const lbDiv=document.createElement('div');lbDiv.id='sideLB3';lbDiv.style.cssText='width:180px;background:rgba(20,20,35,0.95);border:1px solid rgba(255,255,255,0.12);border-radius:10px;padding:10px;max-height:'+Math.round(2800*scale)+'px;overflow-y:auto;flex-shrink:0';
   wrap.appendChild(lbDiv);
   box.appendChild(wrap);
-  const c2=cvs.getContext('2d'),COLS=56,ROWS=56,SZ=24,PAD=20,CW=1400;
+  const c2=cvs.getContext('2d'),COLS=56,ROWS=56,SZ=48,PAD=40,CW=2800;
   const aiColors=[{h:'#E84444',b:'#C03030',n:'赤蛇'},{h:'#E8A844',b:'#C08830',n:'金蛇'},{h:'#44A8E8',b:'#3088C0',n:'蓝蛇'},{h:'#BB44E8',b:'#9030B0',n:'紫蛇'},{h:'#CCCCCC',b:'#999999',n:'银蛇'}];
   const DIRS=[{x:1,y:0},{x:-1,y:0},{x:0,y:1},{x:0,y:-1}];
   let foods=[],snakes=[],started=false,gameOver=false,winner='',prevTs=0,lbShown3=false;
   let chests=[],chestTimer=0,lives=0;
 
   function mkSnake(x,y,dx,dy,len,isP,aiIdx){const b=[];for(let i=0;i<len;i++)b.push({x:x-dx*i,y:y-dy*i});return{body:b,dir:{x:dx,y:dy},ndir:{x:dx,y:dy},isP,aiIdx,alive:true,spd:isP?130:140,accum:0}}
-  function spawnFood(){const sizes=[{sz:1,r:7,color:'#F44',pts:1},{sz:3,r:9,color:'#F94',pts:3},{sz:5,r:11,color:'#FD4',pts:5}];const s=sizes[Math.random()<0.5?0:Math.random()<0.6?1:2];let f;let tries=0;do{f={x:Math.floor(Math.random()*COLS),y:Math.floor(Math.random()*ROWS),...s};tries++}while(tries<200&&(snakes.some(sk=>sk.body.some(b=>b.x===f.x&&b.y===f.y))||foods.some(fo=>fo.x===f.x&&fo.y===f.y)||chests.some(ch=>ch.x===f.x&&ch.y===f.y)));return f}
+  function spawnFood(){const sizes=[{sz:1,r:14,color:'#F44',pts:1},{sz:3,r:18,color:'#F94',pts:3},{sz:5,r:22,color:'#FD4',pts:5}];const s=sizes[Math.random()<0.5?0:Math.random()<0.6?1:2];let f;let tries=0;do{f={x:Math.floor(Math.random()*COLS),y:Math.floor(Math.random()*ROWS),...s};tries++}while(tries<200&&(snakes.some(sk=>sk.body.some(b=>b.x===f.x&&b.y===f.y))||foods.some(fo=>fo.x===f.x&&fo.y===f.y)||chests.some(ch=>ch.x===f.x&&ch.y===f.y)));return f}
   function spawnChest(){let ch;let tries=0;do{ch={x:Math.floor(Math.random()*COLS),y:Math.floor(Math.random()*ROWS),timer:8000};tries++}while(tries<200&&(snakes.some(sk=>sk.body.some(b=>b.x===ch.x&&b.y===ch.y))||foods.some(f=>f.x===ch.x&&f.y===ch.y)||chests.some(c=>c.x===ch.x&&c.y===ch.y)));return ch}
   function init(){snakes=[mkSnake(14,28,1,0,3,true,-1),mkSnake(42,14,0,1,3,false,0),mkSnake(7,49,-1,0,3,false,1),mkSnake(49,42,0,-1,3,false,2),mkSnake(14,7,1,0,3,false,3),mkSnake(49,7,0,1,3,false,4)];foods=[];chests=[];chestTimer=0;lives=0;gameOver=false;winner='';started=false;for(let i=0;i<50;i++)foods.push(spawnFood());drawSnakeLB()}
   function drawSnakeLB(){
@@ -1342,52 +1342,50 @@ function startSnake(){
   function draw(){
     const ox=PAD,oy=PAD;c2.fillStyle='#0D0D1A';c2.fillRect(0,0,CW,CW);
     c2.fillStyle='#111122';c2.fillRect(ox,oy,COLS*SZ,ROWS*SZ);
-    c2.strokeStyle='rgba(255,255,255,0.03)';c2.lineWidth=.5;
+    c2.strokeStyle='rgba(255,255,255,0.03)';c2.lineWidth=1;
     for(let i=0;i<=COLS;i++){c2.beginPath();c2.moveTo(ox+i*SZ,oy);c2.lineTo(ox+i*SZ,oy+ROWS*SZ);c2.stroke()}
     for(let i=0;i<=ROWS;i++){c2.beginPath();c2.moveTo(ox,oy+i*SZ);c2.lineTo(ox+COLS*SZ,oy+i*SZ);c2.stroke()}
     // food
     foods.forEach(f=>{c2.fillStyle=f.color;c2.beginPath();c2.arc(ox+f.x*SZ+SZ/2,oy+f.y*SZ+SZ/2,f.r,0,Math.PI*2);c2.fill();
-      c2.fillStyle='rgba(255,255,255,0.3)';c2.beginPath();c2.arc(ox+f.x*SZ+SZ/2-2,oy+f.y*SZ+SZ/2-2,f.r*.4,0,Math.PI*2);c2.fill()});
+      c2.fillStyle='rgba(255,255,255,0.3)';c2.beginPath();c2.arc(ox+f.x*SZ+SZ/2-4,oy+f.y*SZ+SZ/2-4,f.r*.4,0,Math.PI*2);c2.fill()});
     // chests — steady like food
     chests.forEach(ch=>{const cx=ox+ch.x*SZ+SZ/2,cy=oy+ch.y*SZ+SZ/2;
-      c2.fillStyle='#D4A017';c2.fillRect(cx-12,cy-10,24,20);
-      c2.fillStyle='#B8860B';c2.fillRect(cx-12,cy-10,24,6);
-      c2.fillStyle='#FFD700';c2.fillRect(cx-3,cy-4,6,4);
-      c2.fillStyle='#FFF';c2.fillRect(cx-8,cy-8,5,2);c2.fillRect(cx+3,cy-8,5,2);
-      c2.strokeStyle='#8B6914';c2.lineWidth=2;c2.strokeRect(cx-12,cy-10,24,20);
+      c2.fillStyle='#D4A017';c2.fillRect(cx-24,cy-20,48,40);
+      c2.fillStyle='#B8860B';c2.fillRect(cx-24,cy-20,48,12);
+      c2.fillStyle='#FFD700';c2.fillRect(cx-6,cy-8,12,8);
+      c2.fillStyle='#FFF';c2.fillRect(cx-16,cy-16,10,4);c2.fillRect(cx+6,cy-16,10,4);
+      c2.strokeStyle='#8B6914';c2.lineWidth=4;c2.strokeRect(cx-24,cy-20,48,40);
       c2.lineWidth=1;});
     // snakes
     snakes.forEach(sk=>{if(!sk.alive)return;const clr=sk.isP?{h:'#4F4',b:'#2A2'}:aiColors[sk.aiIdx];
       sk.body.forEach((s,i)=>{const px=ox+s.x*SZ,py=oy+s.y*SZ;
-        if(i===0){c2.fillStyle=clr.h;c2.beginPath();c2.roundRect(px+1,py+1,SZ-2,SZ-2,6);c2.fill();
+        if(i===0){c2.fillStyle=clr.h;c2.beginPath();c2.roundRect(px+2,py+2,SZ-4,SZ-4,12);c2.fill();
           c2.fillStyle='#FFF';const ex1=px+SZ*0.25,ex2=px+SZ*0.7,ey=py+SZ*0.35;
-          c2.beginPath();c2.arc(ex1,ey,4,0,Math.PI*2);c2.fill();c2.beginPath();c2.arc(ex2,ey,4,0,Math.PI*2);c2.fill();
-          c2.fillStyle='#111';c2.beginPath();c2.arc(ex1+1,ey,2,0,Math.PI*2);c2.fill();c2.beginPath();c2.arc(ex2+1,ey,2,0,Math.PI*2);c2.fill()}
-        else{c2.fillStyle=i%3===0?clr.h:clr.b;c2.beginPath();c2.roundRect(px+2,py+2,SZ-4,SZ-4,4);c2.fill()}});
-      if(sk.isP){const h=sk.body[0];c2.fillStyle='#4F4';c2.font='bold 13px Arial';c2.textAlign='center';c2.fillText('YOU',ox+h.x*SZ+SZ/2,oy+h.y*SZ-6)}});
+          c2.beginPath();c2.arc(ex1,ey,8,0,Math.PI*2);c2.fill();c2.beginPath();c2.arc(ex2,ey,8,0,Math.PI*2);c2.fill();
+          c2.fillStyle='#111';c2.beginPath();c2.arc(ex1+2,ey,4,0,Math.PI*2);c2.fill();c2.beginPath();c2.arc(ex2+2,ey,4,0,Math.PI*2);c2.fill()}
+        else{c2.fillStyle=i%3===0?clr.h:clr.b;c2.beginPath();c2.roundRect(px+4,py+4,SZ-8,SZ-8,8);c2.fill()}});
+      if(sk.isP){const h=sk.body[0];c2.fillStyle='#4F4';c2.font='bold 26px Arial';c2.textAlign='center';c2.fillText('YOU',ox+h.x*SZ+SZ/2,oy+h.y*SZ-12)}});
     // HUD
     const alive=snakes.filter(s=>s.alive);
-    c2.fillStyle='rgba(0,0,0,0.65)';c2.fillRect(0,0,CW,44);
-    c2.fillStyle='#FFF';c2.font='bold 20px "PingFang SC"';c2.textAlign='left';c2.fillText('🐍 蛇蛇大作战',16,28);
-    // lives display
-    if(lives>0){c2.fillStyle='#FFD700';c2.font='bold 16px Arial';c2.textAlign='left';c2.fillText('❤️x'+lives,170,28)}
-    // chest countdown
-    c2.fillStyle='#D4A017';c2.font='14px Arial';c2.textAlign='left';c2.fillText('📦 '+(10-Math.floor(chestTimer/1000))+'s',250,28);
-    let lx=370;snakes.forEach((sk,i)=>{if(!sk.alive){c2.fillStyle='rgba(255,255,255,0.2)';c2.font='14px Arial';c2.textAlign='left';c2.fillText((sk.isP?'你':aiColors[sk.aiIdx].n)+' ☠',lx,28);lx+=90;return}
-      c2.fillStyle=sk.isP?'#4F4':aiColors[sk.aiIdx].h;c2.font='bold 14px Arial';c2.textAlign='left';c2.fillText((sk.isP?'你':aiColors[sk.aiIdx].n)+':'+sk.body.length,lx,28);lx+=100});
-    c2.fillStyle='#FFF';c2.font='16px Arial';c2.textAlign='right';c2.fillText('存活 '+alive.length+' 条',CW-16,28);
+    c2.fillStyle='rgba(0,0,0,0.65)';c2.fillRect(0,0,CW,88);
+    c2.fillStyle='#FFF';c2.font='bold 40px "PingFang SC"';c2.textAlign='left';c2.fillText('🐍 蛇蛇大作战',32,56);
+    if(lives>0){c2.fillStyle='#FFD700';c2.font='bold 32px Arial';c2.textAlign='left';c2.fillText('❤️x'+lives,340,56)}
+    c2.fillStyle='#D4A017';c2.font='28px Arial';c2.textAlign='left';c2.fillText('📦 '+(10-Math.floor(chestTimer/1000))+'s',500,56);
+    let lx=740;snakes.forEach((sk,i)=>{if(!sk.alive){c2.fillStyle='rgba(255,255,255,0.2)';c2.font='28px Arial';c2.textAlign='left';c2.fillText((sk.isP?'你':aiColors[sk.aiIdx].n)+' ☠',lx,56);lx+=180;return}
+      c2.fillStyle=sk.isP?'#4F4':aiColors[sk.aiIdx].h;c2.font='bold 28px Arial';c2.textAlign='left';c2.fillText((sk.isP?'你':aiColors[sk.aiIdx].n)+':'+sk.body.length,lx,56);lx+=200});
+    c2.fillStyle='#FFF';c2.font='32px Arial';c2.textAlign='right';c2.fillText('存活 '+alive.length+' 条',CW-32,56);
     // start screen
     if(!started&&!gameOver){c2.fillStyle='rgba(0,0,0,0.7)';c2.fillRect(0,0,CW,CW);
-      c2.fillStyle='#FFF';c2.font='bold 36px "PingFang SC"';c2.textAlign='center';c2.fillText('🐍 蛇蛇大作战',CW/2,CW/2-100);
-      c2.font='22px "PingFang SC"';c2.fillStyle='rgba(255,255,255,0.7)';c2.fillText('按方向键开始！吃豆子成长，吞噬其他蛇！',CW/2,CW/2-50);
-      c2.font='16px "PingFang SC"';c2.fillStyle='rgba(255,255,255,0.4)';c2.fillText('🔴小豆+1   🟠中豆+3   🟡大豆+5   最后存活者获胜',CW/2,CW/2-10);
-      c2.fillStyle='#D4A017';c2.fillText('📦 每10秒出现宝箱，拾取后获得复活次数！',CW/2,CW/2+25);
-      c2.font='16px "PingFang SC"';c2.fillStyle='#4F4';c2.fillText('🟢 你',CW/2-250,CW/2+70);c2.fillStyle='#E84444';c2.fillText('🔴 赤蛇',CW/2-150,CW/2+70);c2.fillStyle='#E8A844';c2.fillText('🟠 金蛇',CW/2-50,CW/2+70);c2.fillStyle='#44A8E8';c2.fillText('🔵 蓝蛇',CW/2+50,CW/2+70);c2.fillStyle='#BB44E8';c2.fillText('🟣 紫蛇',CW/2+150,CW/2+70);c2.fillStyle='#CCC';c2.fillText('⚪ 银蛇',CW/2+250,CW/2+70)}
+      c2.fillStyle='#FFF';c2.font='bold 72px "PingFang SC"';c2.textAlign='center';c2.fillText('🐍 蛇蛇大作战',CW/2,CW/2-200);
+      c2.font='44px "PingFang SC"';c2.fillStyle='rgba(255,255,255,0.7)';c2.fillText('按方向键开始！吃豆子成长，吞噬其他蛇！',CW/2,CW/2-100);
+      c2.font='32px "PingFang SC"';c2.fillStyle='rgba(255,255,255,0.4)';c2.fillText('🔴小豆+1   🟠中豆+3   🟡大豆+5   最后存活者获胜',CW/2,CW/2-20);
+      c2.fillStyle='#D4A017';c2.fillText('📦 每10秒出现宝箱，拾取后获得复活次数！',CW/2,CW/2+50);
+      c2.font='32px "PingFang SC"';c2.fillStyle='#4F4';c2.fillText('🟢 你',CW/2-500,CW/2+140);c2.fillStyle='#E84444';c2.fillText('🔴 赤蛇',CW/2-300,CW/2+140);c2.fillStyle='#E8A844';c2.fillText('🟠 金蛇',CW/2-100,CW/2+140);c2.fillStyle='#44A8E8';c2.fillText('🔵 蓝蛇',CW/2+100,CW/2+140);c2.fillStyle='#BB44E8';c2.fillText('🟣 紫蛇',CW/2+300,CW/2+140);c2.fillStyle='#CCC';c2.fillText('⚪ 银蛇',CW/2+500,CW/2+140)}
     // game over
     if(gameOver&&!lbShown3){lbShown3=true;const snkScore=snakes[0].body.length;addScore('snake',snkScore);drawSnakeLB();setTimeout(()=>{closeMinigame();setTimeout(()=>{openMinigame('🐍 贪吃蛇',()=>{showLeaderboard('snake',snkScore)})},120)},800)}if(gameOver){c2.fillStyle='rgba(0,0,0,0.8)';c2.fillRect(0,0,CW,CW);
-      c2.fillStyle=winner==='你'?'#FFD700':'#FF6666';c2.font='bold 44px Arial';c2.textAlign='center';c2.fillText(winner==='你'?'🎉 你赢了！':'💀 '+winner+' 获胜',CW/2,CW/2-40);
-      c2.fillStyle='#FFF';c2.font='22px Arial';c2.fillText('你的长度: '+snakes[0].body.length,CW/2,CW/2+10);
-      c2.fillStyle='rgba(255,255,255,0.5)';c2.font='18px "PingFang SC"';c2.fillText('关闭窗口重来',CW/2,CW/2+50)}}
+      c2.fillStyle=winner==='你'?'#FFD700':'#FF6666';c2.font='bold 88px Arial';c2.textAlign='center';c2.fillText(winner==='你'?'🎉 你赢了！':'💀 '+winner+' 获胜',CW/2,CW/2-80);
+      c2.fillStyle='#FFF';c2.font='44px Arial';c2.fillText('你的长度: '+snakes[0].body.length,CW/2,CW/2+20);
+      c2.fillStyle='rgba(255,255,255,0.5)';c2.font='36px "PingFang SC"';c2.fillText('关闭窗口重来',CW/2,CW/2+100)}}
 
   function onK(e){if(!mgActive)return;const k=e.key;
     if(k==='ArrowUp'&&snakes[0].dir.y!==1){snakes[0].ndir={x:0,y:-1};started=true;e.preventDefault()}
