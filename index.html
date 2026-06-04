@@ -525,14 +525,15 @@ function openMinigame(title,contentFn){mgActive=true;document.getElementById('mg
 function startPacman(){
   const box=document.getElementById('mgContent');
   const wrap=document.createElement('div');wrap.style.cssText='display:flex;gap:12px;justify-content:center;align-items:flex-start';
-  const cvs=document.createElement('canvas');cvs.width=1200;cvs.height=1260;const pacScale=Math.min(1,(innerHeight*0.82)/1260);cvs.style.cssText='display:block;background:#0D0D1A;border:2px solid rgba(255,255,255,0.2);border-radius:10px;transform:scale('+pacScale+');transform-origin:top center';
+  const cvs=document.createElement('canvas');cvs.width=1300;cvs.height=1350;const pacScale=Math.min(1,(innerHeight*0.82)/1350);cvs.style.cssText='display:block;background:#0D0D1A;border:2px solid rgba(255,255,255,0.2);border-radius:10px;transform:scale('+pacScale+');transform-origin:top center';
   wrap.appendChild(cvs);
   // side leaderboard
-  const lbDiv=document.createElement('div');lbDiv.id='sideLB';lbDiv.style.cssText='width:180px;background:rgba(20,20,35,0.95);border:1px solid rgba(255,255,255,0.12);border-radius:10px;padding:10px;max-height:'+Math.round(1260*pacScale)+'px;overflow-y:auto';
+  const lbDiv=document.createElement('div');lbDiv.id='sideLB';lbDiv.style.cssText='width:180px;background:rgba(20,20,35,0.95);border:1px solid rgba(255,255,255,0.12);border-radius:10px;padding:10px;max-height:'+Math.round(1350*pacScale)+'px;overflow-y:auto';
   wrap.appendChild(lbDiv);
   box.appendChild(wrap);
-  const c2=cvs.getContext('2d'),W=1200,H=1260;
-  const COLS=20,ROWS=20,SZ=60,PX=0,PY=28;
+  const c2=cvs.getContext('2d'),W=1300,H=1350;
+  const COLS=26,ROWS=26,SZ=50,PX=0,PY=28;
+  const CX=Math.floor(COLS/2),CY=Math.floor(ROWS/2);
   const WALL=1,DOT=0,EMPTY=2,POWER=3,GATE=4;
   // powerups: types and state
   const PU_TYPES=[
@@ -591,15 +592,15 @@ function startPacman(){
     // add internal walls based on level
     const patterns=[
       // pattern 0: cross
-      ()=>{for(let r=4;r<16;r++)m[r][10]=WALL;for(let c=4;c<16;c++)m[10][c]=WALL;m[10][10]=DOT;m[9][10]=DOT;m[11][10]=DOT;m[10][9]=DOT;m[10][11]=DOT},
+      ()=>{for(let r=2;r<ROWS-2;r++)m[r][CX]=WALL;for(let c=2;c<COLS-2;c++)m[CY][c]=WALL;m[CY][CX]=DOT;m[CY-1][CX]=DOT;m[CY+1][CX]=DOT;m[CY][CX-1]=DOT;m[CY][CX+1]=DOT},
       // pattern 1: boxes
-      ()=>{[[4,4,6,6],[4,14,6,16],[14,4,16,6],[14,14,16,16]].forEach(([r1,c1,r2,c2])=>{for(let r=r1;r<=r2;r++)for(let c=c1;c<=c2;c++)m[r][c]=WALL})},
+      ()=>{const a=Math.floor(ROWS*.2),b=Math.floor(ROWS*.3),c3=Math.floor(COLS*.7),d=Math.floor(COLS*.8);[[a,a,b,b],[a,c3,b,d],[c3,a,d,b],[c3,c3,d,d]].forEach(([r1,c1,r2,c2])=>{for(let r=r1;r<=r2;r++)for(let cc=c1;cc<=c2;cc++)m[r][cc]=WALL})},
       // pattern 2: H shape
-      ()=>{for(let r=3;r<17;r++){m[r][5]=WALL;m[r][14]=WALL}for(let c=5;c<=14;c++)m[10][c]=WALL;m[10][5]=DOT},
+      ()=>{const l=Math.floor(COLS*.25),r=Math.floor(COLS*.75);for(let i=2;i<ROWS-2;i++){m[i][l]=WALL;m[i][r]=WALL}for(let c=l;c<=r;c++)m[CY][c]=WALL;m[CY][l]=DOT},
       // pattern 3: diamond
-      ()=>{const cx=10,cy=10;for(let r=3;r<17;r++)for(let c=3;c<17;c++){const d=Math.abs(r-cy)+Math.abs(c-cx);if(d>=5&&d<=6)m[r][c]=WALL}},
+      ()=>{for(let r=2;r<ROWS-2;r++)for(let c=2;c<COLS-2;c++){const d=Math.abs(r-CY)+Math.abs(c-CX);if(d>=6&&d<=7)m[r][c]=WALL}},
       // pattern 4: corridors
-      ()=>{for(let r=3;r<17;r+=3)for(let c=2;c<18;c++)m[r][c]=WALL;for(let r=3;r<17;r++)for(let c=4;c<18;c+=4)m[r][c]=DOT},
+      ()=>{for(let r=3;r<ROWS-2;r+=3)for(let c=2;c<COLS-2;c++)m[r][c]=WALL;for(let r=3;r<ROWS-2;r++)for(let c=4;c<COLS-2;c+=4)m[r][c]=DOT},
     ];
     const pi=lv%patterns.length;
     patterns[pi]();
@@ -613,12 +614,13 @@ function startPacman(){
       }
     }
     // ghost house in center
-    for(let r=9;r<=12;r++)for(let c=8;c<=11;c++)m[r][c]=EMPTY;
-    m[8][9]=WALL;m[8][10]=WALL;m[8][11]=WALL;
-    m[13][9]=GATE;m[13][10]=GATE;m[13][11]=GATE;
-    m[9][8]=WALL;m[9][11]=WALL;m[12][8]=WALL;m[12][11]=WALL;
+    const gh1=CY-2,gh2=CY+1,gw1=CX-2,gw2=CX+1;
+    for(let r=gh1;r<=gh2;r++)for(let c=gw1;c<=gw2;c++)m[r][c]=EMPTY;
+    m[gh1-1][gw1]=WALL;m[gh1-1][CX]=WALL;m[gh1-1][gw2]=WALL;
+    m[gh2+1][gw1]=GATE;m[gh2+1][CX]=GATE;m[gh2+1][gw2]=GATE;
+    m[gh1][gw1-1]=WALL;m[gh1][gw2+1]=WALL;m[gh2][gw1-1]=WALL;m[gh2][gw2+1]=WALL;
     // power pellets in corners
-    m[1][1]=POWER;m[1][18]=POWER;m[18][1]=POWER;m[18][18]=POWER;
+    m[1][1]=POWER;m[1][COLS-2]=POWER;m[ROWS-2][1]=POWER;m[ROWS-2][COLS-2]=POWER;
     // ensure connectivity — flood fill from (1,1) and open unreachable dots
     const visited=Array.from({length:ROWS},()=>Array(COLS).fill(false));
     const q=[{r:1,c:1}];visited[1][1]=true;
@@ -646,13 +648,13 @@ function startPacman(){
   countDots();
 
   // pacman
-  let px=10,py=16,pdx=0,pdy=0,ndx=0,ndy=0,mouthAng=0;
+  let px=CX,py=ROWS-4,pdx=0,pdy=0,ndx=0,ndy=0,mouthAng=0;
   // ghosts
   const GCLR=['#FF0000','#FFB8FF','#00FFFF','#FFB852'];
   const GNAME=['Blinky','Pinky','Inky','Clyde'];
   let ghosts=[];
   function spawnGhosts(){
-    ghosts=GCLR.map((c,i)=>({x:9+i*0.5-0.5,y:10,dx:0,dy:-1,color:c,scared:false,eaten:false,relT:i*3,active:false}));
+    ghosts=GCLR.map((c,i)=>({x:CX-1+i*0.5,y:CY,dx:0,dy:-1,color:c,scared:false,eaten:false,frozen:false,relT:i*3,active:false}));
   }
   spawnGhosts();
 
@@ -664,6 +666,16 @@ function startPacman(){
   function canMovePU(x,y){
     if(hasPU('ghost'))return true; // walk through anything
     return canMove(x,y);
+  }
+  function snapIfStuck(){
+    const c=Math.round(px),r=Math.round(py);
+    if(c>=0&&c<COLS&&r>=0&&r<ROWS&&maze[r][c]!==WALL&&maze[r][c]!==GATE)return;
+    for(let d=1;d<Math.max(ROWS,COLS);d++){
+      for(let dr=-d;dr<=d;dr++)for(let dc=-d;dc<=d;dc++){
+        const nr=r+dr,nc=c+dc;
+        if(nr>0&&nr<ROWS-1&&nc>0&&nc<COLS-1&&maze[nr][nc]!==WALL&&maze[nr][nc]!==GATE){px=nc;py=nr;return}
+      }
+    }
   }
   function ghostCanMove(x,y,isScared){
     const c=Math.round(x),r=Math.round(y);
@@ -796,7 +808,7 @@ function startPacman(){
     if(!g.active)return;
     if(g.eaten){
       // return to spawn
-      const tx=10,ty=10;
+      const tx=CX,ty=CY;
       const dx=Math.sign(tx-g.x),dy=Math.sign(ty-g.y);
       if(Math.abs(tx-g.x)>Math.abs(ty-g.y)){
         if(ghostCanMove(g.x+dx,g.y))g.dx=dx;else if(ghostCanMove(g.x,g.y+dy)&&dy)g.dy=dy;
@@ -847,7 +859,7 @@ function startPacman(){
       if(Math.abs(g.x-px)<0.8&&Math.abs(g.y-py)<0.8){
         if(g.scared){g.eaten=true;g.scared=false;score+=200}
         else if(hasPU('shield')){/* invincible, ignore */}
-        else{lives--;if(lives<=0){over=true}else{px=10;py=16;pdx=0;pdy=0;ndx=0;ndy=0;spawnGhosts()}}
+        else{lives--;if(lives<=0){over=true}else{px=CX;py=ROWS-4;pdx=0;pdy=0;ndx=0;ndy=0;spawnGhosts()}}
       }
     });
   }
@@ -907,6 +919,8 @@ function startPacman(){
       if(scaredTimer>0){scaredTimer-=dt;if(scaredTimer<=0)ghosts.forEach(g=>g.scared=false)}
       // powerup timers
       tickPU(dt);
+      // safety: snap pacman to nearest open cell if stuck in wall
+      if(!hasPU('ghost'))snapIfStuck();
       // movement
       moveAccum+=dt*1000;ghostAccum+=dt*1000;
       const speedMul=hasPU('speed')?0.5:1; // speed boost = half interval = double speed
@@ -917,7 +931,7 @@ function startPacman(){
       // level complete
       if(eatenDots>=totalDots){
         level++;score+=level*100;maze=genMaze(level);countDots();
-        px=10;py=16;pdx=0;pdy=0;ndx=0;ndy=0;spawnGhosts();scaredTimer=0;
+        px=CX;py=ROWS-4;pdx=0;pdy=0;ndx=0;ndy=0;spawnGhosts();scaredTimer=0;
         activePU={};puItems=[];puSpawnCD=6;ghosts.forEach(g=>g.frozen=false);
         drawSideLB();
       }
@@ -1210,7 +1224,7 @@ function startSnake(){
 
   function mkSnake(x,y,dx,dy,len,isP,aiIdx){const b=[];for(let i=0;i<len;i++)b.push({x:x-dx*i,y:y-dy*i});return{body:b,dir:{x:dx,y:dy},ndir:{x:dx,y:dy},isP,aiIdx,alive:true,spd:isP?130:140,accum:0}}
   function spawnFood(){const sizes=[{sz:1,r:7,color:'#F44',pts:1},{sz:3,r:9,color:'#F94',pts:3},{sz:5,r:11,color:'#FD4',pts:5}];const s=sizes[Math.random()<0.5?0:Math.random()<0.6?1:2];let f;let tries=0;do{f={x:Math.floor(Math.random()*COLS),y:Math.floor(Math.random()*ROWS),...s};tries++}while(tries<200&&(snakes.some(sk=>sk.body.some(b=>b.x===f.x&&b.y===f.y))||foods.some(fo=>fo.x===f.x&&fo.y===f.y)||chests.some(ch=>ch.x===f.x&&ch.y===f.y)));return f}
-  function spawnChest(){let ch;let tries=0;do{ch={x:Math.floor(Math.random()*COLS),y:Math.floor(Math.random()*ROWS),timer:8};tries++}while(tries<200&&(snakes.some(sk=>sk.body.some(b=>b.x===ch.x&&b.y===ch.y))||foods.some(f=>f.x===ch.x&&f.y===ch.y)||chests.some(c=>c.x===ch.x&&c.y===ch.y)));return ch}
+  function spawnChest(){let ch;let tries=0;do{ch={x:Math.floor(Math.random()*COLS),y:Math.floor(Math.random()*ROWS),timer:8000};tries++}while(tries<200&&(snakes.some(sk=>sk.body.some(b=>b.x===ch.x&&b.y===ch.y))||foods.some(f=>f.x===ch.x&&f.y===ch.y)||chests.some(c=>c.x===ch.x&&c.y===ch.y)));return ch}
   function init(){snakes=[mkSnake(10,20,1,0,3,true,-1),mkSnake(30,10,0,1,3,false,0),mkSnake(5,35,-1,0,3,false,1),mkSnake(35,30,0,-1,3,false,2)];foods=[];chests=[];chestTimer=0;lives=0;gameOver=false;winner='';started=false;for(let i=0;i<25;i++)foods.push(spawnFood());drawSnakeLB()}
   function drawSnakeLB(){
     const el=document.getElementById('sideLB3');if(!el)return;
@@ -1310,9 +1324,9 @@ function startSnake(){
     if(!mgActive){draw();return}
     if(prevTs===0)prevTs=ts;const dt=ts-prevTs;prevTs=ts;
     if(started&&!gameOver){
-      // chest spawn timer
+      // chest spawn timer — max 3 at a time
       chestTimer+=dt;
-      if(chestTimer>=10){chestTimer=0;chests.push(spawnChest())}
+      if(chestTimer>=10000&&chests.length<3){chestTimer=0;chests.push(spawnChest())}
       // chest expiry
       for(let i=chests.length-1;i>=0;i--){chests[i].timer-=dt;if(chests[i].timer<=0)chests.splice(i,1)}
       // AI think
@@ -1331,20 +1345,14 @@ function startSnake(){
     // food
     foods.forEach(f=>{c2.fillStyle=f.color;c2.beginPath();c2.arc(ox+f.x*SZ+SZ/2,oy+f.y*SZ+SZ/2,f.r,0,Math.PI*2);c2.fill();
       c2.fillStyle='rgba(255,255,255,0.3)';c2.beginPath();c2.arc(ox+f.x*SZ+SZ/2-2,oy+f.y*SZ+SZ/2-2,f.r*.4,0,Math.PI*2);c2.fill()});
-    // chests
+    // chests — steady like food
     chests.forEach(ch=>{const cx=ox+ch.x*SZ+SZ/2,cy=oy+ch.y*SZ+SZ/2;
-      const pulse=1+Math.sin(Date.now()*0.005)*0.15;
-      c2.save();c2.translate(cx,cy);c2.scale(pulse,pulse);
-      c2.fillStyle='#D4A017';c2.fillRect(-12,-10,24,20);
-      c2.fillStyle='#B8860B';c2.fillRect(-12,-10,24,6);
-      c2.fillStyle='#FFD700';c2.fillRect(-3,-4,6,4);
-      c2.fillStyle='#FFF';c2.fillRect(-8,-8,5,2);c2.fillRect(3,-8,5,2);
-      c2.strokeStyle='#8B6914';c2.lineWidth=2;c2.strokeRect(-12,-10,24,20);
-      c2.restore();
-      // countdown ring
-      const pct=ch.timer/8;
-      c2.strokeStyle='rgba(255,215,0,'+(pct>0.3?0.6:0.9)+')';c2.lineWidth=2;
-      c2.beginPath();c2.arc(cx,cy,18,-Math.PI/2,-Math.PI/2+Math.PI*2*pct);c2.stroke()});
+      c2.fillStyle='#D4A017';c2.fillRect(cx-12,cy-10,24,20);
+      c2.fillStyle='#B8860B';c2.fillRect(cx-12,cy-10,24,6);
+      c2.fillStyle='#FFD700';c2.fillRect(cx-3,cy-4,6,4);
+      c2.fillStyle='#FFF';c2.fillRect(cx-8,cy-8,5,2);c2.fillRect(cx+3,cy-8,5,2);
+      c2.strokeStyle='#8B6914';c2.lineWidth=2;c2.strokeRect(cx-12,cy-10,24,20);
+      c2.lineWidth=1;});
     // snakes
     snakes.forEach(sk=>{if(!sk.alive)return;const clr=sk.isP?{h:'#4F4',b:'#2A2'}:aiColors[sk.aiIdx];
       sk.body.forEach((s,i)=>{const px=ox+s.x*SZ,py=oy+s.y*SZ;
@@ -1361,7 +1369,7 @@ function startSnake(){
     // lives display
     if(lives>0){c2.fillStyle='#FFD700';c2.font='bold 16px Arial';c2.textAlign='left';c2.fillText('❤️x'+lives,170,28)}
     // chest countdown
-    c2.fillStyle='#D4A017';c2.font='14px Arial';c2.textAlign='left';c2.fillText('📦 '+(10-Math.floor(chestTimer))+'s',250,28);
+    c2.fillStyle='#D4A017';c2.font='14px Arial';c2.textAlign='left';c2.fillText('📦 '+(10-Math.floor(chestTimer/1000))+'s',250,28);
     let lx=370;snakes.forEach((sk,i)=>{if(!sk.alive){c2.fillStyle='rgba(255,255,255,0.2)';c2.font='16px Arial';c2.textAlign='left';c2.fillText((sk.isP?'你':aiColors[sk.aiIdx].n)+' ☠',lx,28);lx+=110;return}
       c2.fillStyle=sk.isP?'#4F4':aiColors[sk.aiIdx].h;c2.font='bold 16px Arial';c2.textAlign='left';c2.fillText((sk.isP?'你':aiColors[sk.aiIdx].n)+':'+sk.body.length,lx,28);lx+=120});
     c2.fillStyle='#FFF';c2.font='16px Arial';c2.textAlign='right';c2.fillText('存活 '+alive.length+' 条',CW-16,28);
