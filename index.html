@@ -1216,8 +1216,8 @@ function startSnake(){
   const lbDiv=document.createElement('div');lbDiv.id='sideLB3';lbDiv.style.cssText='width:180px;background:rgba(20,20,35,0.95);border:1px solid rgba(255,255,255,0.12);border-radius:10px;padding:10px;max-height:600px;overflow-y:auto;flex-shrink:0';
   wrap.appendChild(lbDiv);
   box.appendChild(wrap);
-  const c2=cvs.getContext('2d'),COLS=40,ROWS=40,SZ=34,PAD=20,CW=1400;
-  const aiColors=[{h:'#E84444',b:'#C03030',n:'赤蛇'},{h:'#E8A844',b:'#C08830',n:'金蛇'},{h:'#44A8E8',b:'#3088C0',n:'蓝蛇'}];
+  const c2=cvs.getContext('2d'),COLS=56,ROWS=56,SZ=24,PAD=20,CW=1400;
+  const aiColors=[{h:'#E84444',b:'#C03030',n:'赤蛇'},{h:'#E8A844',b:'#C08830',n:'金蛇'},{h:'#44A8E8',b:'#3088C0',n:'蓝蛇'},{h:'#BB44E8',b:'#9030B0',n:'紫蛇'},{h:'#CCCCCC',b:'#999999',n:'银蛇'}];
   const DIRS=[{x:1,y:0},{x:-1,y:0},{x:0,y:1},{x:0,y:-1}];
   let foods=[],snakes=[],started=false,gameOver=false,winner='',prevTs=0,lbShown3=false;
   let chests=[],chestTimer=0,lives=0;
@@ -1225,7 +1225,7 @@ function startSnake(){
   function mkSnake(x,y,dx,dy,len,isP,aiIdx){const b=[];for(let i=0;i<len;i++)b.push({x:x-dx*i,y:y-dy*i});return{body:b,dir:{x:dx,y:dy},ndir:{x:dx,y:dy},isP,aiIdx,alive:true,spd:isP?130:140,accum:0}}
   function spawnFood(){const sizes=[{sz:1,r:7,color:'#F44',pts:1},{sz:3,r:9,color:'#F94',pts:3},{sz:5,r:11,color:'#FD4',pts:5}];const s=sizes[Math.random()<0.5?0:Math.random()<0.6?1:2];let f;let tries=0;do{f={x:Math.floor(Math.random()*COLS),y:Math.floor(Math.random()*ROWS),...s};tries++}while(tries<200&&(snakes.some(sk=>sk.body.some(b=>b.x===f.x&&b.y===f.y))||foods.some(fo=>fo.x===f.x&&fo.y===f.y)||chests.some(ch=>ch.x===f.x&&ch.y===f.y)));return f}
   function spawnChest(){let ch;let tries=0;do{ch={x:Math.floor(Math.random()*COLS),y:Math.floor(Math.random()*ROWS),timer:8000};tries++}while(tries<200&&(snakes.some(sk=>sk.body.some(b=>b.x===ch.x&&b.y===ch.y))||foods.some(f=>f.x===ch.x&&f.y===ch.y)||chests.some(c=>c.x===ch.x&&c.y===ch.y)));return ch}
-  function init(){snakes=[mkSnake(10,20,1,0,3,true,-1),mkSnake(30,10,0,1,3,false,0),mkSnake(5,35,-1,0,3,false,1),mkSnake(35,30,0,-1,3,false,2)];foods=[];chests=[];chestTimer=0;lives=0;gameOver=false;winner='';started=false;for(let i=0;i<25;i++)foods.push(spawnFood());drawSnakeLB()}
+  function init(){snakes=[mkSnake(14,28,1,0,3,true,-1),mkSnake(42,14,0,1,3,false,0),mkSnake(7,49,-1,0,3,false,1),mkSnake(49,42,0,-1,3,false,2),mkSnake(14,7,1,0,3,false,3),mkSnake(49,7,0,1,3,false,4)];foods=[];chests=[];chestTimer=0;lives=0;gameOver=false;winner='';started=false;for(let i=0;i<50;i++)foods.push(spawnFood());drawSnakeLB()}
   function drawSnakeLB(){
     const el=document.getElementById('sideLB3');if(!el)return;
     const top=getTop('snake');
@@ -1238,7 +1238,7 @@ function startSnake(){
     if(snakes&&snakes[0]){html+='<div style="border-top:1px solid rgba(255,255,255,0.08);margin-top:8px;padding-top:8px"><div style="color:#FFD700;font-size:14px;font-weight:700">长度: '+snakes[0].body.length+'</div><div style="color:rgba(255,255,255,0.5);font-size:10px">❤️x'+lives+'</div></div>'}
     el.innerHTML=html;
   }
-  function respawnPlayer(){const player=snakes[0];const spots=[{x:10,y:20},{x:30,y:10},{x:5,y:35},{x:35,y:30},{x:20,y:20}];const grid=buildGrid(player);let spot=spots[0];for(const s of spots){if(!grid[s.y*COLS+s.x]){spot=s;break}}player.body=[{x:spot.x,y:spot.y}];player.dir={x:1,y:0};player.ndir={x:1,y:0};player.alive=true;player.spd=130;player.accum=0}
+  function respawnPlayer(){const player=snakes[0];const spots=[{x:14,y:28},{x:42,y:14},{x:7,y:49},{x:49,y:42},{x:28,y:28},{x:28,y:7},{x:28,y:49}];const grid=buildGrid(player);let spot=spots[0];for(const s of spots){if(!grid[s.y*COLS+s.x]){spot=s;break}}player.body=[{x:spot.x,y:spot.y}];player.dir={x:1,y:0};player.ndir={x:1,y:0};player.alive=true;player.spd=130;player.accum=0}
 
   function buildGrid(excludeSnake){const g=new Uint8Array(COLS*ROWS);
     snakes.forEach(sk=>{if(!sk.alive||sk===excludeSnake)return;sk.body.forEach(s=>{if(s.x>=0&&s.x<COLS&&s.y>=0&&s.y<ROWS)g[s.y*COLS+s.x]=1})});
@@ -1370,8 +1370,8 @@ function startSnake(){
     if(lives>0){c2.fillStyle='#FFD700';c2.font='bold 16px Arial';c2.textAlign='left';c2.fillText('❤️x'+lives,170,28)}
     // chest countdown
     c2.fillStyle='#D4A017';c2.font='14px Arial';c2.textAlign='left';c2.fillText('📦 '+(10-Math.floor(chestTimer/1000))+'s',250,28);
-    let lx=370;snakes.forEach((sk,i)=>{if(!sk.alive){c2.fillStyle='rgba(255,255,255,0.2)';c2.font='16px Arial';c2.textAlign='left';c2.fillText((sk.isP?'你':aiColors[sk.aiIdx].n)+' ☠',lx,28);lx+=110;return}
-      c2.fillStyle=sk.isP?'#4F4':aiColors[sk.aiIdx].h;c2.font='bold 16px Arial';c2.textAlign='left';c2.fillText((sk.isP?'你':aiColors[sk.aiIdx].n)+':'+sk.body.length,lx,28);lx+=120});
+    let lx=370;snakes.forEach((sk,i)=>{if(!sk.alive){c2.fillStyle='rgba(255,255,255,0.2)';c2.font='14px Arial';c2.textAlign='left';c2.fillText((sk.isP?'你':aiColors[sk.aiIdx].n)+' ☠',lx,28);lx+=90;return}
+      c2.fillStyle=sk.isP?'#4F4':aiColors[sk.aiIdx].h;c2.font='bold 14px Arial';c2.textAlign='left';c2.fillText((sk.isP?'你':aiColors[sk.aiIdx].n)+':'+sk.body.length,lx,28);lx+=100});
     c2.fillStyle='#FFF';c2.font='16px Arial';c2.textAlign='right';c2.fillText('存活 '+alive.length+' 条',CW-16,28);
     // start screen
     if(!started&&!gameOver){c2.fillStyle='rgba(0,0,0,0.7)';c2.fillRect(0,0,CW,CW);
@@ -1379,7 +1379,7 @@ function startSnake(){
       c2.font='22px "PingFang SC"';c2.fillStyle='rgba(255,255,255,0.7)';c2.fillText('按方向键开始！吃豆子成长，吞噬其他蛇！',CW/2,CW/2-50);
       c2.font='16px "PingFang SC"';c2.fillStyle='rgba(255,255,255,0.4)';c2.fillText('🔴小豆+1   🟠中豆+3   🟡大豆+5   最后存活者获胜',CW/2,CW/2-10);
       c2.fillStyle='#D4A017';c2.fillText('📦 每10秒出现宝箱，拾取后获得复活次数！',CW/2,CW/2+25);
-      c2.font='18px "PingFang SC"';c2.fillStyle='#4F4';c2.fillText('🟢 你',CW/2-180,CW/2+70);c2.fillStyle='#E84444';c2.fillText('🔴 赤蛇',CW/2-60,CW/2+70);c2.fillStyle='#E8A844';c2.fillText('🟠 金蛇',CW/2+60,CW/2+70);c2.fillStyle='#44A8E8';c2.fillText('🔵 蓝蛇',CW/2+180,CW/2+70)}
+      c2.font='16px "PingFang SC"';c2.fillStyle='#4F4';c2.fillText('🟢 你',CW/2-250,CW/2+70);c2.fillStyle='#E84444';c2.fillText('🔴 赤蛇',CW/2-150,CW/2+70);c2.fillStyle='#E8A844';c2.fillText('🟠 金蛇',CW/2-50,CW/2+70);c2.fillStyle='#44A8E8';c2.fillText('🔵 蓝蛇',CW/2+50,CW/2+70);c2.fillStyle='#BB44E8';c2.fillText('🟣 紫蛇',CW/2+150,CW/2+70);c2.fillStyle='#CCC';c2.fillText('⚪ 银蛇',CW/2+250,CW/2+70)}
     // game over
     if(gameOver&&!lbShown3){lbShown3=true;const snkScore=snakes[0].body.length;addScore('snake',snkScore);drawSnakeLB();setTimeout(()=>{closeMinigame();setTimeout(()=>{openMinigame('🐍 贪吃蛇',()=>{showLeaderboard('snake',snkScore)})},120)},800)}if(gameOver){c2.fillStyle='rgba(0,0,0,0.8)';c2.fillRect(0,0,CW,CW);
       c2.fillStyle=winner==='你'?'#FFD700':'#FF6666';c2.font='bold 44px Arial';c2.textAlign='center';c2.fillText(winner==='你'?'🎉 你赢了！':'💀 '+winner+' 获胜',CW/2,CW/2-40);
