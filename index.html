@@ -525,14 +525,14 @@ function openMinigame(title,contentFn){mgActive=true;document.getElementById('mg
 function startPacman(){
   const box=document.getElementById('mgContent');
   const wrap=document.createElement('div');wrap.style.cssText='display:flex;gap:12px;justify-content:center;align-items:flex-start';
-  const cvs=document.createElement('canvas');cvs.width=600;cvs.height=660;cvs.style.cssText='display:block;background:#0D0D1A;border:2px solid rgba(255,255,255,0.2);border-radius:10px';
+  const cvs=document.createElement('canvas');cvs.width=1200;cvs.height=1260;const pacScale=Math.min(1,(innerHeight*0.82)/1260);cvs.style.cssText='display:block;background:#0D0D1A;border:2px solid rgba(255,255,255,0.2);border-radius:10px;transform:scale('+pacScale+');transform-origin:top center';
   wrap.appendChild(cvs);
   // side leaderboard
-  const lbDiv=document.createElement('div');lbDiv.id='sideLB';lbDiv.style.cssText='width:180px;background:rgba(20,20,35,0.95);border:1px solid rgba(255,255,255,0.12);border-radius:10px;padding:10px;max-height:660px;overflow-y:auto';
+  const lbDiv=document.createElement('div');lbDiv.id='sideLB';lbDiv.style.cssText='width:180px;background:rgba(20,20,35,0.95);border:1px solid rgba(255,255,255,0.12);border-radius:10px;padding:10px;max-height:'+Math.round(1260*pacScale)+'px;overflow-y:auto';
   wrap.appendChild(lbDiv);
   box.appendChild(wrap);
-  const c2=cvs.getContext('2d'),W=600,H=660;
-  const COLS=20,ROWS=20,SZ=30,PX=30,PY=30;
+  const c2=cvs.getContext('2d'),W=1200,H=1260;
+  const COLS=20,ROWS=20,SZ=60,PX=0,PY=28;
   const WALL=1,DOT=0,EMPTY=2,POWER=3,GATE=4;
 
   // maze templates — infinite levels use variations
@@ -649,12 +649,12 @@ function startPacman(){
         c2.fillStyle='#1A1A8E';c2.fillRect(x,y,SZ,SZ);
         c2.fillStyle='#2828AE';c2.fillRect(x+2,y+2,SZ-4,SZ-4);
       }else if(cell===DOT){
-        c2.fillStyle='#FFD700';c2.beginPath();c2.arc(x+SZ/2,y+SZ/2,3,0,Math.PI*2);c2.fill();
+        c2.fillStyle='#FFD700';c2.beginPath();c2.arc(x+SZ/2,y+SZ/2,6,0,Math.PI*2);c2.fill();
       }else if(cell===POWER){
         const pulse=0.6+Math.sin(Date.now()*0.006)*0.4;
-        c2.fillStyle=`rgba(255,215,0,${pulse})`;c2.beginPath();c2.arc(x+SZ/2,y+SZ/2,7,0,Math.PI*2);c2.fill();
+        c2.fillStyle=`rgba(255,215,0,${pulse})`;c2.beginPath();c2.arc(x+SZ/2,y+SZ/2,14,0,Math.PI*2);c2.fill();
       }else if(cell===GATE){
-        c2.fillStyle='#FF88AA';c2.fillRect(x,y+SZ/2-2,SZ,4);
+        c2.fillStyle='#FF88AA';c2.fillRect(x,y+SZ/2-3,SZ,6);
       }
     }
   }
@@ -680,18 +680,18 @@ function startPacman(){
       c2.closePath();c2.fill();
       // eyes
       if(!g.scared){
-        c2.fillStyle='#FFF';c2.beginPath();c2.arc(x-4,y-5,4,0,Math.PI*2);c2.fill();
-        c2.beginPath();c2.arc(x+4,y-5,4,0,Math.PI*2);c2.fill();
-        c2.fillStyle='#222';c2.beginPath();c2.arc(x-4+g.dx*2,y-5+g.dy*2,2,0,Math.PI*2);c2.fill();
-        c2.beginPath();c2.arc(x+4+g.dx*2,y-5+g.dy*2,2,0,Math.PI*2);c2.fill();
+        c2.fillStyle='#FFF';c2.beginPath();c2.arc(x-8,y-10,8,0,Math.PI*2);c2.fill();
+        c2.beginPath();c2.arc(x+8,y-10,8,0,Math.PI*2);c2.fill();
+        c2.fillStyle='#222';c2.beginPath();c2.arc(x-8+g.dx*4,y-10+g.dy*4,4,0,Math.PI*2);c2.fill();
+        c2.beginPath();c2.arc(x+8+g.dx*4,y-10+g.dy*4,4,0,Math.PI*2);c2.fill();
       }else{
-        c2.fillStyle='#FFF';c2.fillRect(x-5,y-6,3,3);c2.fillRect(x+2,y-6,3,3);
+        c2.fillStyle='#FFF';c2.fillRect(x-10,y-12,6,6);c2.fillRect(x+4,y-12,6,6);
       }
     });
   }
 
   let moveAccum=0,ghostAccum=0,scaredTimer=0;
-  const moveInterval=120,ghostInterval=Math.max(80,160-level*8);
+  const moveInterval=240,ghostInterval=Math.max(160,320-level*16);
 
   function updatePacman(){
     // try queued direction first
@@ -731,7 +731,7 @@ function startPacman(){
       const nx=g.x+d.dx,ny=g.y+d.dy;
       if(!ghostCanMove(nx,ny))continue;
       const dist=Math.abs(nx-target.x)+Math.abs(ny-target.y);
-      if(g.scared)dist+Math.random()*10; // randomize when scared
+      if(g.scared)dist+=Math.random()*10; // randomize when scared
       if(dist<bestD){bestD=dist;best=d}
     }
     if(best){g.dx=best.dx;g.dy=best.dy}
@@ -798,8 +798,8 @@ function startPacman(){
       if(scaredTimer>0){scaredTimer-=dt;if(scaredTimer<=0)ghosts.forEach(g=>g.scared=false)}
       // movement
       moveAccum+=dt*1000;ghostAccum+=dt*1000;
-      const mi=Math.max(60,moveInterval-level*4);
-      const gi=Math.max(60,ghostInterval-level*6);
+      const mi=Math.max(120,moveInterval-level*8);
+      const gi=Math.max(120,ghostInterval-level*12);
       if(moveAccum>=mi){moveAccum-=mi;updatePacman();checkCollision()}
       if(ghostAccum>=gi){ghostAccum-=gi;moveGhosts();checkCollision()}
       // level complete
