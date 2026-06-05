@@ -10,6 +10,8 @@ body{background:#2C2C3A;overflow:hidden;font-family:'Segoe UI','PingFang SC','Mi
 #gameCanvas{display:block;cursor:crosshair}
 #hud{position:fixed;top:16px;left:16px;color:#fff;font-size:14px;z-index:10;pointer-events:none}
 #hud .room-name{background:rgba(0,0,0,0.6);padding:6px 14px;border-radius:8px;backdrop-filter:blur(4px);font-size:16px;font-weight:600}
+#hud .player-tag{background:rgba(0,0,0,0.6);padding:5px 12px;border-radius:8px;backdrop-filter:blur(4px);font-size:13px;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+#hud .player-tag .pt-dot{width:10px;height:10px;border-radius:50%;display:inline-block}
 #controls-hint{position:fixed;bottom:16px;left:calc(50% - 160px);transform:translateX(-50%);color:rgba(255,255,255,0.7);font-size:13px;z-index:10;pointer-events:none;background:rgba(0,0,0,0.45);padding:8px 18px;border-radius:10px;backdrop-filter:blur(4px);white-space:nowrap}
 #dialogBox{position:fixed;bottom:80px;left:calc(50% - 160px);transform:translateX(-50%);background:rgba(30,30,50,0.96);border:2px solid rgba(255,255,255,0.15);border-radius:14px;padding:20px 24px;color:#fff;width:420px;z-index:20;display:none;backdrop-filter:blur(8px)}
 #dialogBox .npc-name{font-size:16px;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:8px}
@@ -89,7 +91,7 @@ body{background:#2C2C3A;overflow:hidden;font-family:'Segoe UI','PingFang SC','Mi
   <div style="margin-top:24px;color:rgba(255,255,255,0.35);font-size:13px">WASD/方向键：移动 | 空格/点击NPC：对话</div>
 </div>
 <canvas id="gameCanvas"></canvas>
-<div id="hud"><div class="room-name" id="roomLabel">走廊</div><button id="switchBtn" onclick="showSwitchChar()" style="margin-left:12px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.15);border-radius:8px;padding:4px 10px;color:rgba(255,255,255,0.7);cursor:pointer;font-size:12px;pointer-events:auto">🔄 换角色</button></div>
+<div id="hud"><div class="player-tag" id="playerTag"><span class="pt-dot" id="ptDot"></span><span id="ptName"></span></div><div class="room-name" id="roomLabel">走廊</div><button id="switchBtn" onclick="showSwitchChar()" style="margin-left:12px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.15);border-radius:8px;padding:4px 10px;color:rgba(255,255,255,0.7);cursor:pointer;font-size:12px;pointer-events:auto">🔄 换角色</button></div>
 <div id="minimap"><canvas id="minimapCanvas" width="180" height="160"></canvas></div>
 <div id="social-feed">
   <div class="feed-hd"><span class="dot"></span>LebotWorld 工作群</div>
@@ -962,7 +964,7 @@ function startBreakout(){
   let padW=100,padX=W/2-50,sc=0,lives=3,over=false,lbShown2=false;
   let level=1,bks=[],combo=0,particles=[];
   // multi-ball support
-  let balls=[{x:W/2,y:H-36,dx:2,dy:-2}];
+  let balls=[{x:W/2,y:H-36,dx:3,dy:-3}];
   const CLR=['#FF4444','#FF8844','#FFCC44','#44CC44','#4488FF','#AA44FF','#FF44AA','#44FFFF','#FFAA44','#44FF88'];
   // effect types: 0=normal, 1=multiball(🔵), 2=explode(💥), 3=tough(🛡️)
   const EFF_CLR=['','','','rgba(255,255,255,0.3)'];
@@ -996,7 +998,7 @@ function startBreakout(){
 
   function resetBalls(){
     balls=[{x:W/2,y:H-36,dx:2,dy:-2}];
-    const spd=2+level*0.3;const ang=Math.PI*0.3+Math.random()*Math.PI*0.4;
+    const spd=3+level*0.45;const ang=Math.PI*0.3+Math.random()*Math.PI*0.4;
     balls[0].dx=spd*Math.cos(ang)*(Math.random()>.5?1:-1);
     balls[0].dy=-spd*Math.sin(ang);combo=0;
   }
@@ -1432,14 +1434,23 @@ function doSwitchChar(newIdx){
     player.cl={body:newCh.body,dark:newCh.dark,light:newCh.light};
     player.name=newCh.name;PC={body:newCh.body,dark:newCh.dark,light:newCh.light}}
   addFeed('event','角色切换为 <b style="color:'+newCh.body+'">'+newCh.name+'</b> ('+newCh.title+')');
+  updatePlayerTag();
   hideSwitchChar()}
 
 // ==================== 游戏状态 ====================
 let player,npcs=[],started=false,dlgAct=false,actNPC=null,keys={},lastT=0,fc=0;
+function updatePlayerTag(){
+  if(!player)return;
+  const ch=ALL_CHARS.find(c=>c.name===player.name)||{};
+  const d=document.getElementById('ptDot'),n=document.getElementById('ptName');
+  if(d)d.style.backgroundColor=PC.body;
+  if(n)n.textContent=(ch.icon||'')+' '+player.name+' · '+(ch.title||'');
+}
 function initGame(){
   const ci=selectedChar>=0?selectedChar:0;
   const pc=ALL_CHARS[ci];PC={body:pc.body,dark:pc.dark,light:pc.light};
   player=new Ch(10,10.5,PC,pc.name,true);
+  updatePlayerTag();
   const starts=[{col:6,row:3},{col:8,row:3},{col:7,row:7},{col:10,row:7}];
   npcs=[];let si=0;
   ALL_CHARS.forEach((ch,i)=>{if(i===ci)return;const s=starts[si];si++;
