@@ -528,8 +528,8 @@ function addScore(game,score,extra){if(!lbData[game])lbData[game]=[];const name=
 function getTop(game){return lbData[game]||[]}
 function showLeaderboard(game,playerScore){
   const box=document.getElementById('mgContent');box.innerHTML='';
-  const icons={'pacman':'👾','breakout':'🧱','snake':'🐍'};
-  const names={'pacman':'吃豆人','breakout':'打砖块','snake':'贪吃蛇大作战'};
+  const icons={'pacman':'🏃','breakout':'🧱','snake':'🐍'};
+  const names={'pacman':'恐龙跑酷','breakout':'打砖块','snake':'贪吃蛇大作战'};
   const hd=document.createElement('div');hd.style.cssText='color:#fff;font-size:20px;font-weight:700;text-align:center;margin-bottom:16px';
   hd.textContent=icons[game]+' '+names[game]+' 排行榜 🏆';box.appendChild(hd);
   if(playerScore!==undefined){const ps=document.createElement('div');ps.style.cssText='text-align:center;margin-bottom:16px;padding:12px;background:rgba(74,144,217,0.15);border:1px solid rgba(74,144,217,0.3);border-radius:10px';
@@ -551,438 +551,341 @@ function showLeaderboard(game,playerScore){
 
 function openMinigame(title,contentFn){mgActive=true;document.getElementById('mgTitle').textContent=title;document.getElementById('mgContent').innerHTML='';document.getElementById('minigame-overlay').classList.add('active');contentFn()}
 
-// ==================== 吃豆人 ====================
+// ==================== 恐龙跑酷 ====================
 function startPacman(){
   const box=document.getElementById('mgContent');
   const wrap=document.createElement('div');wrap.style.cssText='display:flex;gap:12px;justify-content:center;align-items:flex-start';
-  const cvs=document.createElement('canvas');cvs.width=1300;cvs.height=1350;const pacScale=Math.min(1,(innerHeight*0.82)/1350);cvs.style.cssText='display:block;background:#0D0D1A;border:2px solid rgba(255,255,255,0.2);border-radius:10px;transform:scale('+pacScale+');transform-origin:top center';
+  const cvs=document.createElement('canvas');cvs.width=1000;cvs.height=400;
+  const sc=Math.min(1,(innerHeight*0.7)/400);
+  cvs.style.cssText='display:block;background:#F7F7F7;border:2px solid rgba(255,255,255,0.2);border-radius:10px;transform:scale('+sc+');transform-origin:top center';
   wrap.appendChild(cvs);
-  // side leaderboard
-  const lbDiv=document.createElement('div');lbDiv.id='sideLB';lbDiv.style.cssText='width:180px;background:rgba(20,20,35,0.95);border:1px solid rgba(255,255,255,0.12);border-radius:10px;padding:10px;max-height:'+Math.round(1350*pacScale)+'px;overflow-y:auto';
-  wrap.appendChild(lbDiv);
-  box.appendChild(wrap);
-  const c2=cvs.getContext('2d'),W=1300,H=1350;
-  const COLS=26,ROWS=26,SZ=50,PX=0,PY=28;
-  const CX=Math.floor(COLS/2),CY=Math.floor(ROWS/2);
-  const WALL=1,DOT=0,EMPTY=2,POWER=3,GATE=4;
-  // powerups: types and state
-  const PU_TYPES=[
-    {id:'shield', emoji:'🛡️', color:'#44AAFF', name:'无敌', dur:10},
-    {id:'speed',  emoji:'⚡', color:'#FFEE00', name:'加速', dur:8},
-    {id:'freeze', emoji:'❄️', color:'#88EEFF', name:'冰冻', dur:8},
-    {id:'x2',     emoji:'✖️', color:'#FF66FF', name:'双倍', dur:12},
-    {id:'magnet', emoji:'🧲', color:'#FF8844', name:'磁铁', dur:10},
-    {id:'ghost',  emoji:'👻', color:'#AABBFF', name:'穿墙', dur:6},
-  ];
-  let activePU={}; // id -> remaining seconds
-  let puItems=[];  // {x,y,type} on map
-  let puSpawnCD=8; // seconds until next spawn
+  const lbDiv=document.createElement('div');lbDiv.id='sideLB';lbDiv.style.cssText='width:180px;background:rgba(20,20,35,0.95);border:1px solid rgba(255,255,255,0.12);border-radius:10px;padding:10px;max-height:'+Math.round(400*sc)+'px;overflow-y:auto';
+  wrap.appendChild(lbDiv);box.appendChild(wrap);
+  const c2=cvs.getContext('2d'),W=1000,H=400;
+  const GY=330;
+  const GRAVITY=1800,JUMP_VEL=-580;
 
-  function spawnPU(){
-    // find a random empty cell
-    let tries=0,cr,cc;
-    do{cr=1+Math.floor(Math.random()*(ROWS-2));cc=1+Math.floor(Math.random()*(COLS-2));tries++}
-    while(tries<200&&(maze[cr][cc]!==EMPTY||(Math.abs(cr-Math.round(py))<3&&Math.abs(cc-Math.round(px))<3)));
-    if(tries<200){
-      const t=PU_TYPES[Math.floor(Math.random()*PU_TYPES.length)];
-      puItems.push({x:cc,y:cr,type:t});
+  let speed=350,score=0,hiScore=0,lives=3,level=1,over=false,lbShown=false;
+  let started=false,nightMode=false,nightAlpha=0;
+
+  let dino={x:80,y:GY,vy:0,ducking:false,jumping:false,frame:0,frameT:0,invT:0};
+  const DINO_W=44,DINO_H=48,DINO_DUCK_W=58,DINO_DUCK_H=28;
+
+  let obstacles=[],obsCD=1.5;
+  let groundX=0;
+  let clouds=[];for(let i=0;i<4;i++)clouds.push({x:Math.random()*W,y:40+Math.random()*80,w:60+Math.random()*40,s:30+Math.random()*20});
+  let stars=[];for(let i=0;i<30;i++)stars.push({x:Math.random()*W,y:Math.random()*200,s:1+Math.random()*2});
+  let particles=[];
+
+  function addParticle(x,y,color,count){for(let i=0;i<count;i++)particles.push({x,y,vx:(Math.random()-.5)*120,vy:-Math.random()*100,life:0.4+Math.random()*0.3,color,size:2+Math.random()*3})}
+
+  function spawnObs(){
+    const types=[];
+    types.push({type:'cactus_s',w:20,h:40});
+    types.push({type:'cactus_l',w:28,h:55});
+    types.push({type:'cactus_g',w:50,h:40});
+    if(level>=2)types.push({type:'rock',w:36,h:30});
+    if(level>=2)types.push({type:'bird',w:42,h:30,fly:true,flyY:GY-70});
+    if(level>=3)types.push({type:'bird',w:42,h:30,fly:true,flyY:GY-130});
+    if(level>=4)types.push({type:'bird',w:42,h:30,fly:true,flyY:GY-40});
+    if(level>=5)types.push({type:'double_cactus',w:45,h:60});
+    const t=types[Math.floor(Math.random()*types.length)];
+    obstacles.push({x:W+20,y:t.fly?t.flyY:GY,...t,passed:false});
+  }
+
+  function dinoHitbox(){
+    if(dino.ducking)return{x:dino.x,y:dino.y-DINO_DUCK_H,w:DINO_DUCK_W,h:DINO_DUCK_H};
+    return{x:dino.x,y:dino.y-DINO_H,w:DINO_W,h:DINO_H};
+  }
+  function obsHitbox(o){return{x:o.x,y:o.y-o.h,w:o.w,h:o.h}}
+  function collides(a,b){return a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y}
+
+  function drawGround(){
+    c2.fillStyle='#535353';c2.fillRect(0,GY,W,H-GY);
+    c2.strokeStyle='#666';c2.lineWidth=1;c2.beginPath();c2.moveTo(0,GY);c2.lineTo(W,GY);c2.stroke();
+    c2.fillStyle=nightMode?'#4A4A4A':'#5A5A5A';
+    for(let i=0;i<40;i++){
+      const bx=((i*53-groundX*0.5)%W+W)%W;
+      c2.fillRect(bx,GY+8+Math.sin(i*7)*4,Math.max(2,8+Math.sin(i*3)*4),2);
     }
   }
-  function activatePU(t){
-    if(t.id==='shield'||t.id==='speed'||t.id==='freeze'||t.id==='x2'||t.id==='magnet'||t.id==='ghost'){
-      activePU[t.id]=t.dur;
-    }
-    // immediate effects
-    if(t.id==='freeze') ghosts.forEach(g=>{if(g.active&&!g.eaten)g.frozen=true});
-  }
-  function tickPU(dt){
-    // spawn timer
-    puSpawnCD-=dt;
-    if(puSpawnCD<=0&&puItems.length<3){puSpawnCD=6+Math.random()*4;spawnPU()}
-    // expire active powerups
-    for(const k in activePU){
-      activePU[k]-=dt;
-      if(activePU[k]<=0){
-        delete activePU[k];
-        if(k==='freeze') ghosts.forEach(g=>g.frozen=false);
+
+  function drawDino(){
+    const inv=dino.invT>0;
+    if(inv&&Math.floor(dino.invT*10)%2===0)return;
+    const dx=dino.x,dy=dino.y;
+    c2.fillStyle=nightMode?'#E0E0E0':'#535353';
+    if(dino.ducking){
+      c2.fillRect(dx,dy-DINO_DUCK_H,DINO_DUCK_W,DINO_DUCK_H);
+      c2.fillStyle='#FFF';c2.fillRect(dx+DINO_DUCK_W-14,dy-DINO_DUCK_H+6,8,8);
+      c2.fillStyle='#000';c2.fillRect(dx+DINO_DUCK_W-10,dy-DINO_DUCK_H+8,4,4);
+      c2.fillStyle=nightMode?'#E0E0E0':'#535353';
+      c2.fillRect(dx+10,dy,6,8);c2.fillRect(dx+28,dy,6,8);
+    }else{
+      c2.fillRect(dx+10,dy-DINO_H,28,DINO_H-10);
+      c2.fillRect(dx+20,dy-DINO_H-14,24,20);
+      c2.fillStyle='#FFF';c2.fillRect(dx+34,dy-DINO_H-10,8,8);
+      c2.fillStyle='#000';c2.fillRect(dx+38,dy-DINO_H-8,4,4);
+      c2.fillStyle=nightMode?'#E0E0E0':'#535353';
+      c2.fillRect(dx+28,dy-DINO_H+2,16,4);
+      c2.fillRect(dx+6,dy-DINO_H+16,8,4);
+      c2.fillRect(dx+4,dy-DINO_H+20,4,8);
+      c2.fillRect(dx,dy-DINO_H+8,14,6);
+      c2.fillRect(dx-4,dy-DINO_H+4,8,6);
+      c2.fillStyle=nightMode?'#E0E0E0':'#535353';
+      if(dino.jumping){
+        c2.fillRect(dx+14,dy,6,10);c2.fillRect(dx+28,dy,6,10);
+      }else{
+        const lf=dino.frame%2;
+        c2.fillRect(dx+(lf?14:16),dy,6,lf?12:8);
+        c2.fillRect(dx+(lf?28:26),dy,6,lf?8:12);
       }
     }
   }
-  function hasPU(id){return activePU[id]>0}
 
-  // maze templates — infinite levels use variations
-  function genMaze(lv){
-    const m=Array.from({length:ROWS},()=>Array(COLS).fill(WALL));
-    // carve open area
-    for(let r=1;r<ROWS-1;r++)for(let c=1;c<COLS-1;c++){
-      // border walls stay
-      if(r===0||r===ROWS-1||c===0||c===COLS-1)continue;
-      m[r][c]=DOT;
-    }
-    // add internal walls based on level
-    const patterns=[
-      // pattern 0: cross
-      ()=>{for(let r=2;r<ROWS-2;r++)m[r][CX]=WALL;for(let c=2;c<COLS-2;c++)m[CY][c]=WALL;m[CY][CX]=DOT;m[CY-1][CX]=DOT;m[CY+1][CX]=DOT;m[CY][CX-1]=DOT;m[CY][CX+1]=DOT},
-      // pattern 1: boxes
-      ()=>{const a=Math.floor(ROWS*.2),b=Math.floor(ROWS*.3),c3=Math.floor(COLS*.7),d=Math.floor(COLS*.8);[[a,a,b,b],[a,c3,b,d],[c3,a,d,b],[c3,c3,d,d]].forEach(([r1,c1,r2,c2])=>{for(let r=r1;r<=r2;r++)for(let cc=c1;cc<=c2;cc++)m[r][cc]=WALL})},
-      // pattern 2: H shape
-      ()=>{const l=Math.floor(COLS*.25),r=Math.floor(COLS*.75);for(let i=2;i<ROWS-2;i++){m[i][l]=WALL;m[i][r]=WALL}for(let c=l;c<=r;c++)m[CY][c]=WALL;m[CY][l]=DOT},
-      // pattern 3: diamond
-      ()=>{for(let r=2;r<ROWS-2;r++)for(let c=2;c<COLS-2;c++){const d=Math.abs(r-CY)+Math.abs(c-CX);if(d>=6&&d<=7)m[r][c]=WALL}},
-      // pattern 4: corridors
-      ()=>{for(let r=3;r<ROWS-2;r+=3)for(let c=2;c<COLS-2;c++)m[r][c]=WALL;for(let r=3;r<ROWS-2;r++)for(let c=4;c<COLS-2;c+=4)m[r][c]=DOT},
-    ];
-    const pi=lv%patterns.length;
-    patterns[pi]();
-    // extra walls for higher levels
-    if(lv>3){
-      const extra=Math.min(Math.floor(lv/2),8);
-      for(let i=0;i<extra;i++){
-        const r=2+Math.floor(Math.random()*(ROWS-4));
-        const c=2+Math.floor(Math.random()*(COLS-4));
-        if(m[r][c]===DOT)m[r][c]=WALL;
+  function drawObstacle(o){
+    c2.fillStyle=nightMode?'#CCC':'#535353';
+    if(o.type.startsWith('cactus')||o.type==='double_cactus'){
+      const cx=o.x,cy=o.y;
+      c2.fillRect(cx+o.w/2-4,cy-o.h,8,o.h);
+      c2.fillRect(cx,cy-o.h*0.7,8,4);
+      c2.fillRect(cx,cy-o.h*0.7-8,4,12);
+      if(o.w>30){
+        c2.fillRect(cx+o.w-8,cy-o.h*0.5,8,4);
+        c2.fillRect(cx+o.w-4,cy-o.h*0.5-8,4,12);
       }
-    }
-    // ghost house in center
-    const gh1=CY-2,gh2=CY+1,gw1=CX-2,gw2=CX+1;
-    for(let r=gh1;r<=gh2;r++)for(let c=gw1;c<=gw2;c++)m[r][c]=EMPTY;
-    m[gh1-1][gw1]=WALL;m[gh1-1][CX]=WALL;m[gh1-1][gw2]=WALL;
-    m[gh2+1][gw1]=GATE;m[gh2+1][CX]=GATE;m[gh2+1][gw2]=GATE;
-    m[gh1][gw1-1]=WALL;m[gh1][gw2+1]=WALL;m[gh2][gw1-1]=WALL;m[gh2][gw2+1]=WALL;
-    // power pellets in corners
-    m[1][1]=POWER;m[1][COLS-2]=POWER;m[ROWS-2][1]=POWER;m[ROWS-2][COLS-2]=POWER;
-    // ensure connectivity — flood fill from start pos (pac-man can't pass GATE)
-    const visited=Array.from({length:ROWS},()=>Array(COLS).fill(false));
-    const sr=ROWS-4,sc=CX;
-    const q=[{r:sr,c:sc}];if(m[sr][sc]===WALL)m[sr][sc]=DOT;visited[sr][sc]=true;
-    while(q.length){const{r:cr,c:cc}=q.shift();
-      for(const[dr,dc]of[[-1,0],[1,0],[0,-1],[0,1]]){
-        const nr=cr+dr,nc=cc+dc;
-        if(nr>=0&&nr<ROWS&&nc>=0&&nc<COLS&&!visited[nr][nc]&&m[nr][nc]!==WALL&&m[nr][nc]!==GATE){
-          visited[nr][nc]=true;q.push({r:nr,c:nc})}}}
-    // open unreachable areas + ensure start pos clear
-    for(let r=1;r<ROWS-1;r++)for(let c=1;c<COLS-1;c++){
-      if(r===ROWS-4&&c===CX){if(m[r][c]===WALL||m[r][c]===GATE)m[r][c]=DOT;continue}
-      if((Math.abs(r-(ROWS-4))<=1&&Math.abs(c-CX)<=1)&&(m[r][c]===WALL))m[r][c]=DOT;
-      if(m[r][c]===WALL){
-        let adj=0;for(const[dr,dc]of[[-1,0],[1,0],[0,-1],[0,1]]){
-          const nr=r+dr,nc=c+dc;
-          if(nr>=0&&nr<ROWS&&nc>=0&&nc<COLS&&visited[nr][nc])adj++}
-        if(adj>=3)m[r][c]=DOT;
+      if(o.type==='cactus_g'){
+        c2.fillRect(cx+o.w*0.6,cy-o.h+8,8,o.h-8);
+        c2.fillRect(cx+o.w*0.6+8,cy-o.h*0.5,4,8);
       }
-    }
-    return m;
-  }
-
-  let maze=genMaze(1),level=1,score=0,over=false,lbShown=false,lives=3;
-  let totalDots=0,eatenDots=0;
-  // count dots
-  function countDots(){totalDots=0;eatenDots=0;for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++)if(maze[r][c]===DOT||maze[r][c]===POWER)totalDots++}
-  countDots();
-
-  // pacman
-  let px=CX,py=ROWS-4,pdx=0,pdy=0,ndx=0,ndy=0,mouthAng=0;
-  // ghosts
-  const GCLR=['#FF0000','#FFB8FF','#00FFFF','#FFB852'];
-  const GNAME=['Blinky','Pinky','Inky','Clyde'];
-  let ghosts=[];
-  function spawnGhosts(){
-    ghosts=GCLR.map((c,i)=>({x:CX-1+i*0.5,y:CY,dx:0,dy:-1,color:c,scared:false,eaten:false,frozen:false,relT:i*3,active:false}));
-  }
-  spawnGhosts();
-
-  function canMove(x,y){
-    const c=Math.round(x),r=Math.round(y);
-    if(c<0||c>=COLS||r<0||r>=ROWS)return false;
-    return maze[r][c]!==WALL&&maze[r][c]!==GATE;
-  }
-  function canMovePU(x,y){
-    if(hasPU('ghost'))return true; // walk through anything
-    return canMove(x,y);
-  }
-  function snapIfStuck(){
-    const c=Math.round(px),r=Math.round(py);
-    if(c>=0&&c<COLS&&r>=0&&r<ROWS&&maze[r][c]!==WALL&&maze[r][c]!==GATE)return;
-    for(let d=1;d<Math.max(ROWS,COLS);d++){
-      for(let dr=-d;dr<=d;dr++)for(let dc=-d;dc<=d;dc++){
-        const nr=r+dr,nc=c+dc;
-        if(nr>0&&nr<ROWS-1&&nc>0&&nc<COLS-1&&maze[nr][nc]!==WALL&&maze[nr][nc]!==GATE){px=nc;py=nr;pdx=0;pdy=0;return}
+      if(o.type==='double_cactus'){
+        c2.fillRect(cx+o.w*0.6,cy-o.h,8,o.h);
+        c2.fillRect(cx+o.w*0.6+8,cy-o.h*0.6,4,8);
+        c2.fillRect(cx+o.w*0.6-4,cy-o.h*0.4,4,10);
       }
+    }else if(o.type==='rock'){
+      c2.beginPath();c2.moveTo(o.x,o.y);c2.lineTo(o.x+6,o.y-o.h);
+      c2.lineTo(o.x+o.w-8,o.y-o.h+4);c2.lineTo(o.x+o.w,o.y);c2.closePath();c2.fill();
+      c2.fillStyle=nightMode?'#BBB':'#666';
+      c2.beginPath();c2.moveTo(o.x+8,o.y-o.h+4);c2.lineTo(o.x+o.w/2,o.y-o.h-6);
+      c2.lineTo(o.x+o.w-6,o.y-o.h+2);c2.closePath();c2.fill();
+    }else if(o.type==='bird'){
+      const bx=o.x,by=o.y;
+      c2.fillStyle=nightMode?'#CCC':'#535353';
+      c2.fillRect(bx+8,by-8,o.w-16,12);
+      c2.fillRect(bx+o.w-8,by-6,12,4);
+      const wf=Math.sin(Date.now()*0.01)*10;
+      c2.beginPath();c2.moveTo(bx+10,by-8);c2.lineTo(bx+o.w/2,by-22+wf);c2.lineTo(bx+o.w-10,by-8);c2.closePath();c2.fill();
+      c2.fillStyle='#FFF';c2.fillRect(bx+o.w-6,by-8,4,4);
     }
   }
-  function ghostCanMove(x,y,isScared){
-    const c=Math.round(x),r=Math.round(y);
-    if(c<0||c>=COLS||r<0||r>=ROWS)return false;
-    const cell=maze[r][c];
-    return cell!==WALL;
+
+  function drawClouds(){
+    clouds.forEach(cl=>{
+      c2.fillStyle=nightMode?'rgba(200,200,200,0.15)':'rgba(200,200,200,0.5)';
+      c2.beginPath();
+      c2.arc(cl.x,cl.y,cl.w*0.3,0,Math.PI*2);
+      c2.arc(cl.x+cl.w*0.25,cl.y-8,cl.w*0.25,0,Math.PI*2);
+      c2.arc(cl.x+cl.w*0.5,cl.y,cl.w*0.28,0,Math.PI*2);
+      c2.fill();
+    });
+  }
+
+  function drawStars(){
+    if(!nightMode)return;
+    stars.forEach(s=>{
+      const twinkle=0.5+Math.sin(Date.now()*0.003+s.x)*0.5;
+      c2.fillStyle=`rgba(255,255,255,${twinkle*nightAlpha})`;
+      c2.beginPath();c2.arc(s.x,s.y,s.s,0,Math.PI*2);c2.fill();
+    });
+  }
+
+  function drawParticles(){
+    particles.forEach(p=>{c2.fillStyle=p.color;c2.fillRect(p.x,p.y,p.size,p.size)});
+  }
+
+  function drawHUD(){
+    c2.fillStyle=nightMode?'#DDD':'#535353';
+    c2.font='bold 16px "Courier New",monospace';c2.textAlign='right';
+    c2.fillText(String(score).padStart(5,'0'),W-20,30);
+    c2.font='12px "Courier New",monospace';
+    c2.fillStyle=nightMode?'#AAA':'#999';
+    c2.fillText('HI '+String(hiScore).padStart(5,'0'),W-100,30);
+    c2.fillStyle=nightMode?'#AAA':'#888';c2.textAlign='left';c2.font='bold 13px "Courier New",monospace';
+    c2.fillText('Lv.'+level,14,28);
+    c2.fillStyle='#FF4444';c2.font='18px Arial';c2.textAlign='left';
+    for(let i=0;i<lives;i++)c2.fillText('❤',14+i*22,52);
+    c2.fillStyle=nightMode?'#666':'#AAA';c2.font='11px "Courier New",monospace';
+    c2.fillText('SPD '+Math.round(speed),14,70);
+  }
+
+  function drawStart(){
+    c2.fillStyle=nightMode?'#DDD':'#535353';c2.font='bold 28px "Courier New",monospace';c2.textAlign='center';
+    c2.fillText('按 空格 或 ↑ 开始',W/2,H/2-20);
+    c2.font='14px "Courier New",monospace';c2.fillStyle=nightMode?'#AAA':'#888';
+    c2.fillText('↑ / 空格 = 跳跃    ↓ = 蹲下',W/2,H/2+20);
+  }
+
+  function drawGameOver(){
+    c2.fillStyle='rgba(0,0,0,0.5)';c2.fillRect(0,0,W,H);
+    c2.fillStyle='#FF4444';c2.font='bold 36px "Courier New",monospace';c2.textAlign='center';
+    c2.fillText('G A M E  O V E R',W/2,H/2-30);
+    c2.fillStyle='#FFF';c2.font='18px "Courier New",monospace';
+    c2.fillText('Score: '+score+' | Lv.'+level,W/2,H/2+10);
+    c2.fillStyle='#AAA';c2.font='14px "Courier New",monospace';
+    c2.fillText('按 空格 重新开始',W/2,H/2+45);
   }
 
   function drawSideLB(){
     const el=document.getElementById('sideLB');if(!el)return;
     const top=getTop('pacman');
-    let html='<div style="color:#fff;font-size:13px;font-weight:700;margin-bottom:8px;text-align:center">👾 排行榜</div>';
+    let html='<div style="color:#fff;font-size:13px;font-weight:700;margin-bottom:8px;text-align:center">🏃 跑酷排行榜</div>';
     if(top.length===0)html+='<div style="color:rgba(255,255,255,0.3);font-size:11px;text-align:center">暂无记录</div>';
     top.forEach((r,i)=>{
       const medal=i===0?'🥇':i===1?'🥈':i===2?'🥉':' '+(i+1);
       const lvl=r.level?' <span style="color:#88CCFF">Lv.'+r.level+'</span>':'';
-      html+=`<div style="display:flex;align-items:center;gap:6px;padding:4px 6px;margin-bottom:3px;background:rgba(255,255,255,0.04);border-radius:6px;font-size:11px"><span>${medal}</span><span style="color:#fff;flex:1">${r.name}${lvl}</span><span style="color:#FFD700;font-weight:700">${r.score}</span></div>`;
+      html+='<div style="display:flex;align-items:center;gap:6px;padding:4px 6px;margin-bottom:3px;background:rgba(255,255,255,0.04);border-radius:6px;font-size:11px"><span>'+medal+'</span><span style="color:#fff;flex:1">'+r.name+lvl+'</span><span style="color:#FFD700;font-weight:700">'+r.score+'</span></div>';
     });
     html+='<div style="border-top:1px solid rgba(255,255,255,0.08);margin-top:8px;padding-top:8px">';
-    html+=`<div style="color:rgba(255,255,255,0.5);font-size:10px">当前: Lv.${level}</div>`;
-    html+=`<div style="color:#FFD700;font-size:14px;font-weight:700">分数: ${score}</div>`;
+    html+='<div style="color:rgba(255,255,255,0.5);font-size:10px">当前: Lv.'+level+'</div>';
+    html+='<div style="color:#FFD700;font-size:14px;font-weight:700">分数: '+score+'</div>';
     html+='</div>';
     el.innerHTML=html;
   }
   drawSideLB();
 
-  function drawMaze(){
-    for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
-      const x=PX+c*SZ,y=PY+r*SZ,cell=maze[r][c];
-      if(cell===WALL){
-        c2.fillStyle='#1A1A8E';c2.fillRect(x,y,SZ,SZ);
-        c2.fillStyle='#2828AE';c2.fillRect(x+2,y+2,SZ-4,SZ-4);
-      }else if(cell===DOT){
-        c2.fillStyle='#FFD700';c2.beginPath();c2.arc(x+SZ/2,y+SZ/2,6,0,Math.PI*2);c2.fill();
-      }else if(cell===POWER){
-        const pulse=0.6+Math.sin(Date.now()*0.006)*0.4;
-        c2.fillStyle=`rgba(255,215,0,${pulse})`;c2.beginPath();c2.arc(x+SZ/2,y+SZ/2,14,0,Math.PI*2);c2.fill();
-      }else if(cell===GATE){
-        c2.fillStyle='#FF88AA';c2.fillRect(x,y+SZ/2-3,SZ,6);
-      }
-    }
-  }
-  function drawPacman(){
-    const x=PX+px*SZ+SZ/2,y=PY+py*SZ+SZ/2;
-    mouthAng+=0.15;const ma=Math.abs(Math.sin(mouthAng))*0.35;
-    const angle=pdx===1?0:pdx===-1?Math.PI:pdy===1?Math.PI/2:pdy===-1?-Math.PI/2:0;
-    // shield aura
-    if(hasPU('shield')){
-      c2.fillStyle='rgba(68,170,255,0.18)';c2.beginPath();c2.arc(x,y,SZ/2+8,0,Math.PI*2);c2.fill();
-      c2.strokeStyle='rgba(68,170,255,0.6)';c2.lineWidth=3;c2.stroke();c2.lineWidth=1;
-    }
-    // ghost mode aura
-    if(hasPU('ghost')){
-      c2.fillStyle='rgba(170,187,255,0.15)';c2.beginPath();c2.arc(x,y,SZ/2+6,0,Math.PI*2);c2.fill();
-    }
-    // speed trail
-    if(hasPU('speed')){
-      c2.fillStyle='rgba(255,238,0,0.25)';
-      c2.beginPath();c2.arc(x-pdx*12,y-pdy*12,SZ/3,0,Math.PI*2);c2.fill();
-      c2.beginPath();c2.arc(x-pdx*22,y-pdy*22,SZ/5,0,Math.PI*2);c2.fill();
-    }
-    c2.fillStyle=hasPU('x2')?'#FF88FF':'#FFE020';
-    c2.beginPath();c2.arc(x,y,SZ/2-2,angle+ma,angle+Math.PI*2-ma);c2.lineTo(x,y);c2.fill();
-  }
-  function drawGhosts(){
-    ghosts.forEach(g=>{
-      if(g.eaten)return;
-      const x=PX+g.x*SZ+SZ/2,y=PY+g.y*SZ+SZ/2;
-      const color=g.frozen?'#88DDFF':g.scared?'#2222FF':g.color;
-      c2.fillStyle=color;c2.beginPath();
-      c2.arc(x,y-2,SZ/2-3,Math.PI,0);
-      c2.lineTo(x+SZ/2-3,y+SZ/2-4);
-      for(let i=0;i<3;i++){
-        const bx=x+SZ/2-3-i*(SZ/3-2);
-        c2.lineTo(bx-SZ/6+3,y+SZ/2-8);c2.lineTo(bx-SZ/3+3,y+SZ/2-4);
-      }
-      c2.closePath();c2.fill();
-      if(g.frozen){
-        // ice overlay
-        c2.strokeStyle='rgba(200,240,255,0.7)';c2.lineWidth=3;c2.stroke();
-        c2.font='16px Arial';c2.textAlign='center';c2.fillText('❄',x,y-2);
-        c2.lineWidth=1;
-      }else if(!g.scared){
-        c2.fillStyle='#FFF';c2.beginPath();c2.arc(x-8,y-10,8,0,Math.PI*2);c2.fill();
-        c2.beginPath();c2.arc(x+8,y-10,8,0,Math.PI*2);c2.fill();
-        c2.fillStyle='#222';c2.beginPath();c2.arc(x-8+g.dx*4,y-10+g.dy*4,4,0,Math.PI*2);c2.fill();
-        c2.beginPath();c2.arc(x+8+g.dx*4,y-10+g.dy*4,4,0,Math.PI*2);c2.fill();
-      }else{
-        c2.fillStyle='#FFF';c2.fillRect(x-10,y-12,6,6);c2.fillRect(x+4,y-12,6,6);
-      }
-    });
+  function reset(){
+    dino={x:80,y:GY,vy:0,ducking:false,jumping:false,frame:0,frameT:0,invT:0};
+    obstacles=[];obsCD=1.5;speed=350;score=0;lives=3;level=1;
+    over=false;lbShown=false;started=true;
+    particles=[];groundX=0;nightMode=false;nightAlpha=0;
   }
 
-  let moveAccum=0,ghostAccum=0,scaredTimer=0;
-  const moveInterval=240,ghostInterval=Math.max(160,320-level*16);
-
-  function updatePacman(){
-    // try queued direction first
-    if(ndx!==0||ndy!==0){
-      if(canMovePU(px+ndx,py+ndy)){pdx=ndx;pdy=ndy;ndx=0;ndy=0}
-    }
-    if(!canMovePU(px+pdx,py+pdy)){pdx=0;pdy=0;return}
-    px+=pdx;py+=pdy;
-    // eat dot
-    const c=Math.round(px),r=Math.round(py);
-    if(r>=0&&r<ROWS&&c>=0&&c<COLS){
-      const pts=hasPU('x2')?2:1;
-      if(maze[r][c]===DOT){maze[r][c]=EMPTY;score+=10*pts;eatenDots++}
-      else if(maze[r][c]===POWER){maze[r][c]=EMPTY;score+=50*pts;eatenDots++;scaredTimer=5+Math.random()*3;ghosts.forEach(g=>{if(g.active&&!g.eaten)g.scared=true})}
-    }
-    // magnet: eat dots in radius
-    if(hasPU('magnet')){
-      for(let dr=-2;dr<=2;dr++)for(let dc=-2;dc<=2;dc++){
-        const mr=r+dr,mc=c+dc;
-        if(mr>=0&&mr<ROWS&&mc>=0&&mc<COLS&&(maze[mr][mc]===DOT||maze[mr][mc]===POWER)){
-          if(maze[mr][mc]===POWER){scaredTimer=5+Math.random()*3;ghosts.forEach(g=>{if(g.active&&!g.eaten)g.scared=true})}
-          score+=(maze[mr][mc]===DOT?10:50);maze[mr][mc]=EMPTY;eatenDots++;
-        }
-      }
-    }
-    // pick up powerup items
-    for(let i=puItems.length-1;i>=0;i--){
-      if(Math.abs(puItems[i].x-px)<0.8&&Math.abs(puItems[i].y-py)<0.8){
-        activatePU(puItems[i].type);puItems.splice(i,1);
-      }
-    }
-  }
-
-  function ghostAI(g){
-    if(!g.active)return;
-    if(g.eaten){
-      // return to spawn
-      const tx=CX,ty=CY;
-      const dx=Math.sign(tx-g.x),dy=Math.sign(ty-g.y);
-      if(Math.abs(tx-g.x)>Math.abs(ty-g.y)){
-        if(ghostCanMove(g.x+dx,g.y))g.dx=dx;else if(ghostCanMove(g.x,g.y+dy)&&dy)g.dy=dy;
-      }else{
-        if(ghostCanMove(g.x,g.y+dy)&&dy)g.dy=dy;else if(ghostCanMove(g.x+dx,g.y))g.dx=dx;
-      }
-      if(Math.abs(g.x-tx)<0.5&&Math.abs(g.y-ty)<0.5){g.eaten=false;g.scared=false;g.x=tx;g.y=ty}
-      return;
-    }
-    const target=g.scared?{x:Math.random()*COLS|0,y:Math.random()*ROWS|0}:{x:Math.round(px),y:Math.round(py)};
-    // choose direction toward target
-    const dirs=[{dx:1,dy:0},{dx:-1,dy:0},{dx:0,dy:1},{dx:0,dy:-1}];
-    let best=null,bestD=999;
-    for(const d of dirs){
-      if(d.dx===-g.dx&&d.dy===-g.dy)continue;
-      const nx=g.x+d.dx,ny=g.y+d.dy;
-      if(!ghostCanMove(nx,ny))continue;
-      const dist=Math.abs(nx-target.x)+Math.abs(ny-target.y);
-      if(g.scared)dist+=Math.random()*10; // randomize when scared
-      if(dist<bestD){bestD=dist;best=d}
-    }
-    if(best){g.dx=best.dx;g.dy=best.dy}
-    else{
-      // reverse if stuck
-      for(const d of dirs){
-        if(ghostCanMove(g.x+d.dx,g.y+d.dy)){g.dx=d.dx;g.dy=d.dy;break}
-      }
-    }
-  }
-
-  function moveGhosts(){
-    ghosts.forEach(g=>{
-      if(!g.active||g.frozen)return;
-      ghostAI(g);
-      const nx=g.x+g.dx,ny=g.y+g.dy;
-      if(ghostCanMove(nx,ny)){g.x=nx;g.y=ny}
-      else{
-        // try other dirs
-        const dirs=[{dx:1,dy:0},{dx:-1,dy:0},{dx:0,dy:1},{dx:0,dy:-1}].sort(()=>Math.random()-.5);
-        for(const d of dirs){if(ghostCanMove(g.x+d.dx,g.y+d.dy)){g.dx=d.dx;g.dy=d.dy;g.x+=d.dx;g.y+=d.dy;break}}
-      }
-    });
-  }
-
-  function checkCollision(){
-    ghosts.forEach(g=>{
-      if(!g.active||g.eaten||g.frozen)return;
-      if(Math.abs(g.x-px)<0.8&&Math.abs(g.y-py)<0.8){
-        if(g.scared){g.eaten=true;g.scared=false;score+=200}
-        else if(hasPU('shield')){/* invincible, ignore */}
-        else{lives--;if(lives<=0){over=true}else{px=CX;py=ROWS-4;pdx=0;pdy=0;ndx=0;ndy=0;spawnGhosts()}}
-      }
-    });
-  }
-
-  function draw(){
-    c2.fillStyle='#0D0D1A';c2.fillRect(0,0,W,H);
-    drawMaze();
-    // draw powerup items on map
-    puItems.forEach(pu=>{
-      const ix=PX+pu.x*SZ+SZ/2,iy=PY+pu.y*SZ+SZ/2;
-      const bob=Math.sin(Date.now()*0.004+pu.x)*4;
-      // glow
-      c2.fillStyle=pu.type.color+'33';c2.beginPath();c2.arc(ix,iy+bob,SZ/2,0,Math.PI*2);c2.fill();
-      // emoji
-      c2.font='28px Arial';c2.textAlign='center';c2.textBaseline='middle';
-      c2.fillText(pu.type.emoji,ix,iy+bob);
-      c2.textBaseline='alphabetic';
-    });
-    drawPacman();drawGhosts();
-    // HUD top bar
-    c2.fillStyle='rgba(0,0,0,0.6)';c2.fillRect(0,0,W,26);
-    c2.fillStyle='#FFE020';c2.font='bold 14px Arial';c2.textAlign='left';c2.fillText('👾 Lv.'+level,8,17);
-    c2.fillStyle='#FFF';c2.textAlign='center';c2.fillText('Score: '+score,W/2,17);
-    c2.fillStyle='#FF6666';c2.textAlign='right';c2.fillText('❤'.repeat(lives),W-8,17);
-    // active powerup indicators below HUD
-    let puX=8;
-    for(const k in activePU){
-      const t=PU_TYPES.find(p=>p.id===k);if(!t)continue;
-      const rem=Math.ceil(activePU[k]);
-      c2.fillStyle=t.color+'44';c2.fillRect(puX,28,80,20);c2.strokeStyle=t.color;c2.lineWidth=1;c2.strokeRect(puX,28,80,20);
-      c2.fillStyle='#FFF';c2.font='12px Arial';c2.textAlign='left';c2.fillText(t.emoji+' '+t.name+' '+rem+'s',puX+4,42);
-      // timer bar
-      const pct=activePU[k]/t.dur;
-      c2.fillStyle=t.color;c2.fillRect(puX,46,80*pct,3);
-      puX+=86;
-    }
-    // progress bar
-    const pct=totalDots>0?eatenDots/totalDots:0;
-    c2.fillStyle='rgba(255,255,255,0.1)';c2.fillRect(10,H-12,W-20,8);
-    c2.fillStyle='#FFE020';c2.fillRect(10,H-12,(W-20)*pct,8);
-    if(over&&!lbShown){
-      lbShown=true;addScore('pacman',score,{level});drawSideLB();
-      setTimeout(()=>{closeMinigame();setTimeout(()=>openMinigame('👾 吃豆人',()=>showLeaderboard('pacman',score)),120)},1200);
-    }
-    if(over){c2.fillStyle='rgba(0,0,0,0.75)';c2.fillRect(0,0,W,H);c2.fillStyle='#FF4444';c2.font='bold 32px Arial';c2.textAlign='center';c2.fillText('GAME OVER',W/2,H/2-20);c2.fillStyle='#FFF';c2.font='18px Arial';c2.fillText('Score: '+score+' | Lv.'+level,W/2,H/2+20)}
-  }
-
-  let lastT2=0;
+  let lastT2=0,sideLBcd=0;
   function tick(ts){
-    if(!mgActive){draw();return}
+    if(!mgActive){return}
     if(lastT2===0)lastT2=ts;
     const dt=Math.min((ts-lastT2)/1000,0.05);lastT2=ts;
-    if(!over){
-      // ghost release timer
-      ghosts.forEach(g=>{if(!g.active){g.relT-=dt;if(g.relT<=0)g.active=true}});
-      // scared timer
-      if(scaredTimer>0){scaredTimer-=dt;if(scaredTimer<=0)ghosts.forEach(g=>g.scared=false)}
-      // powerup timers
-      tickPU(dt);
-      // safety: snap pacman to nearest open cell if stuck in wall
-      if(!hasPU('ghost'))snapIfStuck();
-      // movement
-      moveAccum+=dt*1000;ghostAccum+=dt*1000;
-      const speedMul=hasPU('speed')?0.5:1; // speed boost = half interval = double speed
-      const mi=Math.max(80,moveInterval*speedMul-level*8);
-      const gi=Math.max(120,ghostInterval-level*12);
-      if(moveAccum>=mi){moveAccum-=mi;updatePacman();checkCollision()}
-      if(ghostAccum>=gi){ghostAccum-=gi;moveGhosts();checkCollision()}
-      // level complete
-      if(eatenDots>=totalDots){
-        level++;score+=level*100;maze=genMaze(level);countDots();
-        px=CX;py=ROWS-4;pdx=0;pdy=0;ndx=0;ndy=0;spawnGhosts();scaredTimer=0;
-        activePU={};puItems=[];puSpawnCD=6;ghosts.forEach(g=>g.frozen=false);
-        drawSideLB();
-      }
-      if(fc%15===0)drawSideLB();
+
+    const bg=nightMode?'#1A1A2E':'#F7F7F7';
+    c2.fillStyle=bg;c2.fillRect(0,0,W,H);
+
+    if(nightMode){nightAlpha=Math.min(1,nightAlpha+dt*0.5);drawStars()}
+    drawClouds();
+
+    if(!started){
+      drawGround();drawDino();drawStart();
+      requestAnimationFrame(tick);return;
     }
-    draw();requestAnimationFrame(tick);
+
+    if(!over){
+      groundX+=speed*dt;
+
+      score+=Math.round(speed*dt*0.05);
+      const newLv=Math.floor(score/500)+1;
+      if(newLv>level){
+        level=newLv;
+        speed=350+level*25;
+        if(level%4===0)nightMode=!nightMode;
+        sideLBcd=0;drawSideLB();
+      }
+      if(score>hiScore)hiScore=score;
+
+      if(dino.jumping){
+        dino.vy+=GRAVITY*dt;
+        dino.y+=dino.vy*dt;
+        if(dino.y>=GY){dino.y=GY;dino.vy=0;dino.jumping=false}
+      }
+      dino.frameT+=dt;
+      if(dino.frameT>0.1){dino.frameT=0;dino.frame++}
+      if(dino.invT>0)dino.invT-=dt;
+
+      obsCD-=dt;
+      if(obsCD<=0){
+        spawnObs();
+        const minCD=Math.max(0.4,1.5-level*0.08);
+        const maxCD=Math.max(0.8,2.5-level*0.1);
+        obsCD=minCD+Math.random()*(maxCD-minCD);
+      }
+
+      obstacles.forEach(o=>{o.x-=speed*dt});
+      obstacles=obstacles.filter(o=>{
+        if(o.x+o.w<-10){
+          if(!o.passed){o.passed=true;score+=10}
+          return false;
+        }
+        return true;
+      });
+
+      clouds.forEach(cl=>{cl.x-=cl.s*dt;if(cl.x+cl.w<-20){cl.x=W+Math.random()*100;cl.y=40+Math.random()*80}});
+
+      const dh=dinoHitbox();
+      for(const o of obstacles){
+        if(o.passed)continue;
+        const oh=obsHitbox(o);
+        const s=6;
+        const da={x:dh.x+s,y:dh.y+s,w:dh.w-s*2,h:dh.h-s*2};
+        const oa={x:oh.x+s,y:oh.y+s,w:oh.w-s*2,h:oh.h-s*2};
+        if(collides(da,oa)){
+          if(dino.invT<=0){
+            lives--;
+            addParticle(dino.x+20,dino.y-20,'#FF4444',12);
+            if(lives<=0){over=true;lbShown=false}
+            else{dino.invT=2;obstacles=obstacles.filter(ob=>ob.x>dino.x+100)}
+          }
+          break;
+        }
+        if(o.x+o.w<dino.x)o.passed=true;
+      }
+
+      particles.forEach(p=>{p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=300*dt;p.life-=dt});
+      particles=particles.filter(p=>p.life>0);
+
+      if(!dino.jumping&&Math.random()<0.3)addParticle(dino.x+5,dino.y,'rgba(150,150,150,0.5)',1);
+    }
+
+    drawGround();
+    obstacles.forEach(drawObstacle);
+    drawDino();
+    drawParticles();
+    drawHUD();
+
+    sideLBcd++;if(sideLBcd%30===0)drawSideLB();
+
+    if(over){
+      if(!lbShown){
+        lbShown=true;
+        addScore('pacman',score,{level});drawSideLB();
+        setTimeout(()=>{closeMinigame();setTimeout(()=>openMinigame('🏃 恐龙跑酷',()=>showLeaderboard('pacman',score)),120)},1500);
+      }
+      drawGameOver();
+    }
+
+    requestAnimationFrame(tick);
   }
+
   function onK(e){
-    if(over||!mgActive)return;
+    if(!mgActive)return;
     const k=e.key;
-    if(k==='ArrowLeft'){ndx=-1;ndy=0;e.preventDefault()}
-    else if(k==='ArrowRight'){ndx=1;ndy=0;e.preventDefault()}
-    else if(k==='ArrowUp'){ndx=0;ndy=-1;e.preventDefault()}
-    else if(k==='ArrowDown'){ndx=0;ndy=1;e.preventDefault()}
+    if(k==='ArrowDown'){
+      e.preventDefault();
+      if(started&&!over&&!dino.jumping)dino.ducking=true;
+    }
+    if(k==='ArrowUp'||k===' '){
+      e.preventDefault();
+      if(!started){reset();return}
+      if(over){reset();return}
+      if(!dino.jumping){
+        dino.jumping=true;dino.vy=JUMP_VEL;dino.ducking=false;
+        addParticle(dino.x+20,GY,'rgba(150,150,150,0.6)',5);
+      }
+    }
   }
+  function onKU(e){if(e.key==='ArrowDown')dino.ducking=false}
   document.addEventListener('keydown',onK);
-  const oc=closeMinigame;closeMinigame=function(){document.removeEventListener('keydown',onK);oc()};
-  draw();requestAnimationFrame(tick);
+  document.addEventListener('keyup',onKU);
+  const oc=closeMinigame;closeMinigame=function(){document.removeEventListener('keydown',onK);document.removeEventListener('keyup',onKU);oc()};
+  requestAnimationFrame(tick);
 }
 
 
@@ -1036,7 +939,7 @@ const RECIPES=[
 function showAllLeaderboard(){const box=document.getElementById('mgContent');box.innerHTML='';
   const hd=document.createElement('div');hd.style.cssText='color:#fff;font-size:20px;font-weight:700;text-align:center;margin-bottom:16px';hd.textContent='🏆 游戏排行榜';box.appendChild(hd);
   const tabs=document.createElement('div');tabs.style.cssText='display:flex;gap:6px;justify-content:center;margin-bottom:14px';
-  const games=[{key:'pacman',icon:'👾',name:'吃豆人'},{key:'breakout',icon:'🧱',name:'砖块'},{key:'snake',icon:'🐍',name:'蛇蛇'}];
+  const games=[{key:'pacman',icon:'🏃',name:'恐龙跑酷'},{key:'breakout',icon:'🧱',name:'砖块'},{key:'snake',icon:'🐍',name:'蛇蛇'}];
   let activeTab='tetris';
   function renderTab(key){const panel=document.getElementById('lbPanel');if(!panel)return;panel.innerHTML='';
     const top=getTop(key);if(top.length===0){panel.innerHTML='<div style="text-align:center;color:rgba(255,255,255,0.4);padding:20px">暂无记录</div>';return}
@@ -1053,7 +956,7 @@ function showAllLeaderboard(){const box=document.getElementById('mgContent');box
 function showGameSelect(){
   openMinigame('🎮 选择游戏',()=>{
     const box=document.getElementById('mgContent');box.innerHTML='';
-    const games=[{name:'吃豆人',emoji:'👾',desc:'经典吃豆冒险',fn:startPacman},{name:'打砖块',emoji:'🧱',desc:'弹球消除砖块',fn:startBreakout},{name:'贪吃蛇',emoji:'🐍',desc:'吃食物变长',fn:startSnake},{name:'排行榜',emoji:'🏆',desc:'查看最佳成绩',fn:()=>{closeMinigame();setTimeout(()=>openMinigame('🏆 排行榜',showAllLeaderboard),120)}}];
+    const games=[{name:'恐龙跑酷',emoji:'🏃',desc:'无尽跑酷冒险',fn:startPacman},{name:'打砖块',emoji:'🧱',desc:'弹球消除砖块',fn:startBreakout},{name:'贪吃蛇',emoji:'🐍',desc:'吃食物变长',fn:startSnake},{name:'排行榜',emoji:'🏆',desc:'查看最佳成绩',fn:()=>{closeMinigame();setTimeout(()=>openMinigame('🏆 排行榜',showAllLeaderboard),120)}}];
     const grid=document.createElement('div');grid.style.cssText='display:flex;gap:12px;justify-content:center;flex-wrap:wrap';
     games.forEach(g=>{const card=document.createElement('div');card.style.cssText='width:140px;padding:20px;border-radius:12px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);cursor:pointer;text-align:center;transition:all .15s';
       card.innerHTML=`<div style="font-size:40px;margin-bottom:8px">${g.emoji}</div><div style="color:#fff;font-size:15px;font-weight:700;margin-bottom:4px">${g.name}</div><div style="color:rgba(255,255,255,0.5);font-size:12px">${g.desc}</div>`;
