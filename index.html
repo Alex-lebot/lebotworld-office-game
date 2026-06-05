@@ -64,6 +64,7 @@ body{background:#2C2C3A;overflow:hidden;font-family:'Segoe UI','PingFang SC','Mi
 #minigame-box .mg-close{position:absolute;top:8px;right:14px;cursor:pointer;color:rgba(255,255,255,0.5);font-size:22px;z-index:5}
 #minigame-box .mg-close:hover{color:#fff}
 #minigame-box .mg-title{font-size:18px;font-weight:700;color:#fff;margin-bottom:12px;text-align:center}
+#story-body::-webkit-scrollbar{width:6px}#story-body::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.15);border-radius:3px}
 </style>
 </head>
 <body>
@@ -97,6 +98,15 @@ body{background:#2C2C3A;overflow:hidden;font-family:'Segoe UI','PingFang SC','Mi
   </div>
 </div>
 <div id="minigame-overlay"><div id="minigame-box"><span class="mg-close" onclick="closeMinigame()">&times;</span><div class="mg-title" id="mgTitle"></div><div id="mgContent"></div></div></div>
+<div id="story-overlay" style="position:fixed;inset:0;z-index:60;display:none;background:rgba(0,0,0,0.75);align-items:center;justify-content:center;backdrop-filter:blur(6px)">
+  <div id="story-box" style="background:rgba(25,25,40,0.98);border:2px solid rgba(255,255,255,0.2);border-radius:16px;width:700px;max-height:85vh;display:flex;flex-direction:column;overflow:hidden">
+    <div style="padding:14px 20px;border-bottom:1px solid rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:between">
+      <span id="story-title" style="color:#fff;font-size:18px;font-weight:700;flex:1"></span>
+      <span onclick="closeStory()" style="cursor:pointer;color:rgba(255,255,255,0.5);font-size:22px;margin-left:12px">&times;</span>
+    </div>
+    <div id="story-body" style="flex:1;overflow-y:auto;padding:20px 28px;color:rgba(255,255,255,0.85);font-size:14px;line-height:2;white-space:pre-wrap;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,0.15) transparent"></div>
+  </div>
+</div>
 <script>
 // ==================== 配置 (2x scale) ====================
 const TW=64,TH=32,MC=20,MR=17,WH=28,SPD=3.5,PR=0.3,WB=16;
@@ -1463,7 +1473,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   if(!sel)return;
   ALL_CHARS.forEach((ch,i)=>{
     const card=document.createElement('div');card.className='char-card';
-    card.innerHTML='<div class="avatar" style="background:'+ch.body+'">'+ch.icon+'</div><div class="cname">'+ch.name+'</div><div class="ctitle">'+ch.title+'</div>';
+    card.innerHTML='<div class="avatar" style="background:'+ch.body+'">'+ch.icon+'</div><div class="cname">'+ch.name+'</div><div class="ctitle">'+ch.title+'</div><div style="margin-top:6px;font-size:10px;color:rgba(255,255,255,0.4);cursor:pointer" onclick="event.stopPropagation();openStory(\''+ch.name+'\')">📖 故事</div>';
     card.onclick=()=>{
       sel.querySelectorAll('.char-card').forEach(c=>c.classList.remove('selected'));
       card.classList.add('selected');selectedChar=i;
@@ -1567,7 +1577,7 @@ function genR(txt,npc){const p=NPC_P[npc.name];if(!p)return'...';let t='general'
   else if(/谢|thanks|thank/.test(txt))t='thanks';
   else if(/再见|拜拜|bye|回头|走了/.test(txt))t='bye';
   const rs=p.r[t]||p.r.general;return rs[Math.floor(Math.random()*rs.length)]}
-function openDlg(npc){dlgAct=true;actNPC=npc;document.getElementById('dialogBox').style.display='block';document.getElementById('npcDot').style.backgroundColor=npc.cl.body;document.getElementById('npcNameLabel').textContent=npc.name+' - '+npc.title;const h=document.getElementById('chatHistory');h.innerHTML='';aCM(npc.name,npc.greet(),'n');const qo=document.getElementById('quickOpts');qo.innerHTML='';['你好！','在忙什么？','聊聊AI产品？','再见！'].forEach(t=>{const d=document.createElement('div');d.className='quick-opt';d.textContent=t;d.addEventListener('click',()=>sMsg(t));qo.appendChild(d)});document.getElementById('chatInput').value='';document.getElementById('chatInput').focus()}
+function openDlg(npc){dlgAct=true;actNPC=npc;document.getElementById('dialogBox').style.display='block';document.getElementById('npcDot').style.backgroundColor=npc.cl.body;document.getElementById('npcNameLabel').textContent=npc.name+' - '+npc.title;const h=document.getElementById('chatHistory');h.innerHTML='';aCM(npc.name,npc.greet(),'n');const qo=document.getElementById('quickOpts');qo.innerHTML='';['你好！','在忙什么？','聊聊AI产品？','📖 你的故事','再见！'].forEach(t=>{const d=document.createElement('div');d.className='quick-opt';d.textContent=t;d.addEventListener('click',()=>{if(t.includes('故事')){closeDialog();openStory(npc.name)}else sMsg(t)});qo.appendChild(d)});document.getElementById('chatInput').value='';document.getElementById('chatInput').focus()}
 function aCM(name,text,type){const h=document.getElementById('chatHistory');const d=document.createElement('div');d.className='chat-msg '+(type==='p'?'p':'n');d.innerHTML='<span class="s">'+name+'：</span>'+text;h.appendChild(d);h.scrollTop=h.scrollHeight}
 function sMsg(text){if(!text.trim()||!actNPC)return;aCM(player.name,text,'p');feedChat(player.name,text);addBubble(player.name,text);setTimeout(()=>{const r=genR(text,actNPC);aCM(actNPC.name,r,'n');feedChat(actNPC.name,r)},300+Math.random()*500);document.getElementById('chatInput').value=''}
 document.addEventListener('DOMContentLoaded',()=>{document.getElementById('chatInput').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();sMsg(e.target.value)}})});
@@ -1635,6 +1645,10 @@ function renderBG(){cx.clearRect(0,0,cv.width,cv.height);const bg=cx.createLinea
   dWS(glassW);gE().forEach(el=>{if(el.t==='f')dFI(el.it);else if(el.t==='n'){el.ch.draw();const s=el.ch.sp;const em={idle:'💤',working:'💻',testing:'🤖',lab_work:'🔧',kitchen:'☕',course_dev:'📚',meeting_state:'📋',event:'📢',moving:'🚶'};cx.font='12px Arial';cx.textAlign='center';cx.fillText(em[el.ch.state]||'💤',s.x+18,s.y-35)}});dWS(solidW);drawDoors();drawBubbles()}
 function startGame(){document.getElementById('title-screen').style.display='none';started=true;lastT=performance.now()}
 requestAnimationFrame(loop);window.startGame=startGame;window.closeDialog=closeDialog;window.closeMinigame=closeMinigame;
+function openStory(name){const s=CHAR_STORIES[name];if(!s)return;document.getElementById('story-title').textContent=name+'的背景故事';document.getElementById('story-body').textContent=s;document.getElementById('story-overlay').style.display='flex'}
+function closeStory(){document.getElementById('story-overlay').style.display='none'}
+window.openStory=openStory;window.closeStory=closeStory;
 </script>
+<script src="stories.js"></script>
 </body>
 </html>
