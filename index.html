@@ -587,8 +587,10 @@ function startPacman(){
     return{color:ch.body,dark:ch.dark,light:ch.light,name:ch.name,title:ch.title,icon:ch.icon};
   })();
 
-  let speed=450,score=0,hiScore=0,lives=3,level=1,over=false,lbShown=false;
+  let speed=450,score=0,hiScore=parseInt(localStorage.getItem('lw_runner_hi')||'0'),lives=1,level=1,over=false,lbShown=false;
   let started=false,nightMode=false,nightAlpha=0,gameTime=0;
+  // death animation state: 'none','cut_half','crow_carry'
+  let deathAnim='none',deathTimer=0,deathCrow=null;
 
   let robot={x:80,y:GY,vy:0,jumping:false,frame:0,frameT:0,invT:0};
   const RB_W=40,RB_H=50;
@@ -623,14 +625,20 @@ function startPacman(){
     if(dm>=3.0)types.push({type:'double',w:50,h:50});
     const t=types[Math.floor(Math.random()*types.length)];
     obstacles.push({x:W+20,y:GY,w:t.w,h:t.h,type:t.type,passed:false});
-    // consecutive obstacles at higher difficulty
-    if(dm>=2.0&&Math.random()<0.4){
+    // consecutive obstacles — more chains
+    const chainChance=0.3+dm*0.1;
+    if(Math.random()<chainChance){
+      const gap=60+Math.random()*30;
       const t2=types[Math.floor(Math.random()*types.length)];
-      obstacles.push({x:W+20+t.w+40+Math.random()*30,y:GY,w:t2.w,h:t2.h,type:t2.type,passed:false});
+      obstacles.push({x:W+20+t.w+gap,y:GY,w:t2.w,h:t2.h,type:t2.type,passed:false});
     }
-    if(dm>=3.0&&Math.random()<0.3){
+    if(dm>=1.5&&Math.random()<0.25){
       const t3=types[Math.floor(Math.random()*types.length)];
-      obstacles.push({x:W+20+t.w+90+Math.random()*40,y:GY,w:t3.w,h:t3.h,type:t3.type,passed:false});
+      obstacles.push({x:W+20+t.w+130+Math.random()*40,y:GY,w:t3.w,h:t3.h,type:t3.type,passed:false});
+    }
+    if(dm>=2.5&&Math.random()<0.2){
+      const t4=types[Math.floor(Math.random()*types.length)];
+      obstacles.push({x:W+20+t.w+200+Math.random()*30,y:GY,w:t4.w,h:t4.h,type:t4.type,passed:false});
     }
   }
 
@@ -662,6 +670,37 @@ function startPacman(){
     if(inv&&Math.floor(robot.invT*10)%2===0)return;
     const rx=robot.x,ry=robot.y;
     const col=robotConf.color,dk=robotConf.dark,lt=robotConf.light;
+
+    // death animation: cut in half
+    if(deathAnim==='cut_half'){
+      const fall=Math.min(deathTimer*120,80);
+      // top half - falls left
+      c2.save();c2.translate(rx+RB_W/2,ry-RB_H+10);c2.rotate(-fall*0.02);
+      c2.fillStyle=col;c2.fillRect(-RB_W/2+2,-10,RB_W-4,RB_H/2-8);
+      c2.fillStyle=lt;c2.fillRect(-RB_W/2+6,-24,28,16);
+      c2.fillStyle='#FF0000';c2.fillRect(-RB_W/2+10,-24+5,6,6);c2.fillRect(-RB_W/2+22,-24+5,6,6);
+      // spark at cut
+      c2.fillStyle='#FF4444';c2.fillRect(-RB_W/2+8,8+Math.random()*4,RB_W-16,3);
+      c2.restore();
+      // bottom half - falls right
+      c2.save();c2.translate(rx+RB_W/2,ry-6);c2.rotate(fall*0.015);
+      c2.fillStyle=dk;c2.fillRect(-RB_W/2+4,0,RB_W-8,14);
+      c2.fillStyle=lt;c2.fillRect(-RB_W/2+8,14,12,4);c2.fillRect(-RB_W/2+22,14,12,4);
+      c2.restore();
+      return;
+    }
+    // death animation: carried by crow
+    if(deathAnim==='crow_carry'&&deathCrow){
+      const cx=deathCrow.x,cy=deathCrow.y;
+      c2.save();c2.translate(cx-10,cy+14);
+      c2.fillStyle=col;c2.fillRect(0,0,RB_W-8,RB_H-20);
+      c2.fillStyle=lt;c2.fillRect(4,-14,24,16);
+      c2.fillStyle='#FF0000';c2.fillRect(8,-10,6,6);c2.fillRect(20,-10,6,6);
+      c2.restore();
+      // draw the crow carrying
+      drawCrowAt(deathCrow.x,deathCrow.y-5);
+      return;
+    }
     // shadow
     c2.fillStyle='rgba(0,0,0,0.2)';c2.beginPath();c2.ellipse(rx+RB_W/2,ry+2,18,5,0,0,Math.PI*2);c2.fill();
     // body
@@ -711,6 +750,9 @@ function startPacman(){
         c2.beginPath();c2.arc(jx,jy,3+Math.random()*4,0,Math.PI*2);c2.fill();
       }
     }
+    // name tag above robot
+    c2.fillStyle=col;c2.font='bold 11px "PingFang SC",sans-serif';c2.textAlign='center';
+    c2.fillText(robotConf.name+'号',rx+RB_W/2,ry-RB_H-16);
   }
 
   function drawObstacle(o){
@@ -744,9 +786,17 @@ function startPacman(){
     }
   }
 
-  function drawCrow(cr){
+  function drawCrowAt(cx,cy){
     c2.fillStyle='#222';
-    const cx=cr.x,cy=cr.y;
+    c2.beginPath();c2.ellipse(cx,cy,16,8,0,0,Math.PI*2);c2.fill();
+    const wf=Math.sin(Date.now()*0.012+cx)*12;
+    c2.beginPath();c2.moveTo(cx-8,cy);c2.lineTo(cx-22,cy-10+wf);c2.lineTo(cx-14,cy+2);c2.closePath();c2.fill();
+    c2.beginPath();c2.moveTo(cx+8,cy);c2.lineTo(cx+22,cy-10-wf);c2.lineTo(cx+14,cy+2);c2.closePath();c2.fill();
+    c2.beginPath();c2.arc(cx+14,cy-2,5,0,Math.PI*2);c2.fill();
+    c2.fillStyle='#FF8800';c2.beginPath();c2.moveTo(cx+19,cy-2);c2.lineTo(cx+26,cy);c2.lineTo(cx+19,cy+2);c2.closePath();c2.fill();
+    c2.fillStyle='#FF0';c2.beginPath();c2.arc(cx+16,cy-3,2,0,Math.PI*2);c2.fill();
+  }
+  function drawCrow(cr){drawCrowAt(cr.x,cr.y)}
     // body
     c2.beginPath();c2.ellipse(cx,cy,16,8,0,0,Math.PI*2);c2.fill();
     // wings
@@ -786,22 +836,20 @@ function startPacman(){
   }
 
   function drawHUD(){
-    c2.fillStyle='#CCC';c2.font='bold 16px "Courier New",monospace';c2.textAlign='right';
-    c2.fillText(String(score).padStart(5,'0'),W-20,30);
+    c2.fillStyle='#FFD700';c2.font='bold 20px "Courier New",monospace';c2.textAlign='right';
+    c2.fillText(String(score),W-20,30);
     c2.font='12px "Courier New",monospace';c2.fillStyle='#888';
-    c2.fillText('HI '+String(hiScore).padStart(5,'0'),W-100,30);
+    c2.fillText('HI '+String(hiScore),W-20,48);
     // robot name
     c2.fillStyle=robotConf.color;c2.textAlign='left';c2.font='bold 13px "PingFang SC",monospace';
     c2.fillText(robotConf.icon+' '+robotConf.name+'号机器人',14,22);
     c2.fillStyle='#888';c2.font='11px "Courier New",monospace';
-    c2.fillText('Lv.'+level+' | '+Math.round(gameTime)+'s',14,38);
-    c2.fillStyle='#FF4444';c2.font='18px Arial';c2.textAlign='left';
-    for(let i=0;i<lives;i++)c2.fillText('❤',14+i*22,58);
+    c2.fillText('Lv.'+level+' | '+Math.round(gameTime)+'s',14,46);
     // speed bar
     const spPct=Math.min(1,(speed-450)/350);
-    c2.fillStyle='rgba(255,255,255,0.1)';c2.fillRect(14,64,80,6);
+    c2.fillStyle='rgba(255,255,255,0.1)';c2.fillRect(14,56,80,6);
     const barCol=spPct<0.5?'#44AAFF':spPct<0.8?'#FFAA00':'#FF4444';
-    c2.fillStyle=barCol;c2.fillRect(14,64,80*spPct,6);
+    c2.fillStyle=barCol;c2.fillRect(14,56,80*spPct,6);
   }
 
   function drawStart(){
@@ -846,8 +894,8 @@ function startPacman(){
 
   function reset(){
     robot={x:80,y:GY,vy:0,jumping:false,frame:0,frameT:0,invT:0};
-    obstacles=[];obsCD=1.0;speed=450;score=0;lives=3;level=1;
-    over=false;lbShown=false;started=true;
+    obstacles=[];obsCD=1.0;speed=450;score=0;lives=1;level=1;
+    over=false;lbShown=false;started=true;deathAnim='none';deathTimer=0;deathCrow=null;
     particles=[];groundX=0;nightMode=false;nightAlpha=0;gameTime=0;
     crows=[];crowCD=6;
   }
@@ -929,23 +977,20 @@ function startPacman(){
         const oh=obsHitbox(o);
         const s=5;
         if(collides({x:dh.x+s,y:dh.y+s,w:dh.w-s*2,h:dh.h-s*2},{x:oh.x+s,y:oh.y+s,w:oh.w-s*2,h:oh.h-s*2})){
-          if(robot.invT<=0){
-            lives--;addParticle(robot.x+20,robot.y-20,'#FF4444',12);
-            if(lives<=0){over=true;lbShown=false}else{robot.invT=2;obstacles=obstacles.filter(ob=>ob.x>robot.x+100)}
-          }
+          over=true;deathAnim='cut_half';deathTimer=0;lbShown=false;
+          addParticle(robot.x+20,robot.y-25,'#FF4444',15);
+          addParticle(robot.x+20,robot.y-10,'#FFAA00',8);
           break;
         }
         if(o.x+o.w<robot.x)o.passed=true;
       }
-      // collision with crows (smaller hitbox)
-      for(const cr of crows){
+      // collision with crows
+      if(!over)for(const cr of crows){
         if(cr.passed)continue;
         const crBox={x:cr.x-14,y:cr.y-6,w:28,h:12};
         if(collides({x:dh.x+4,y:dh.y+4,w:dh.w-8,h:dh.h-8},{x:crBox.x+4,y:crBox.y+2,w:crBox.w-8,h:crBox.h-4})){
-          if(robot.invT<=0){
-            lives--;addParticle(robot.x+20,robot.y-20,'#FF4444',12);
-            if(lives<=0){over=true;lbShown=false}else{robot.invT=2}
-          }
+          over=true;deathAnim='crow_carry';deathTimer=0;deathCrow={x:cr.x,y:cr.y,phase:cr.phase};lbShown=false;
+          addParticle(robot.x+20,robot.y-20,'#FF4444',8);
           cr.passed=true;break;
         }
         if(cr.x+14<robot.x)cr.passed=true;
@@ -967,11 +1012,18 @@ function startPacman(){
     sideLBcd++;if(sideLBcd%30===0)drawSideLB();
 
     if(over){
-      if(!lbShown){
-        lbShown=true;addScore('pacman',score,{level});drawSideLB();
-        setTimeout(()=>{closeMinigame();setTimeout(()=>openMinigame('🤖 机器人跑酷',()=>showLeaderboard('pacman',score)),120)},1500);
+      // death animation updates
+      deathTimer+=dt;
+      if(deathAnim==='cut_half'){
+        if(deathTimer>1.5&&!lbShown){lbShown=true;if(score>hiScore){hiScore=score;localStorage.setItem('lw_runner_hi',String(hiScore))}addScore('pacman',score,{level});drawSideLB();setTimeout(()=>{closeMinigame();setTimeout(()=>openMinigame('🤖 机器人跑酷',()=>showLeaderboard('pacman',score)),120)},1500)}
+        if(deathTimer>1.5)drawGameOver();
       }
-      drawGameOver();
+      if(deathAnim==='crow_carry'){
+        // crow flies away with robot
+        if(deathCrow){deathCrow.x+=200*dt;deathCrow.y-=120*dt}
+        if(deathTimer>2.0&&!lbShown){lbShown=true;if(score>hiScore){hiScore=score;localStorage.setItem('lw_runner_hi',String(hiScore))}addScore('pacman',score,{level});drawSideLB();setTimeout(()=>{closeMinigame();setTimeout(()=>openMinigame('🤖 机器人跑酷',()=>showLeaderboard('pacman',score)),120)},1500)}
+        if(deathTimer>2.0)drawGameOver();
+      }
     }
 
     requestAnimationFrame(tick);
