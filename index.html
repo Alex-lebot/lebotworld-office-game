@@ -1153,12 +1153,12 @@ function startBreakout(){
     const grad=c2.createLinearGradient(padX,H-18,padX+padW,H-18);grad.addColorStop(0,'#4A90D9');grad.addColorStop(1,'#357ABD');
     c2.fillStyle=grad;c2.beginPath();c2.roundRect(padX,H-18,padW,12,6);c2.fill();
     c2.fillStyle='rgba(255,255,255,0.3)';c2.fillRect(padX+4,H-17,padW-8,4);
-    // extra paddle
+    // extra paddle — same row as main paddle, placed beside it
     if(pad2X>=0){
-      const p2W=100;
-      const grad2=c2.createLinearGradient(pad2X,H-58,pad2X+p2W,H-58);grad2.addColorStop(0,'#00DDAA');grad2.addColorStop(1,'#00AA88');
-      c2.fillStyle=grad2;c2.beginPath();c2.roundRect(pad2X,H-58,p2W,12,6);c2.fill();
-      c2.fillStyle='rgba(255,255,255,0.3)';c2.fillRect(pad2X+4,H-57,p2W-8,4);
+      const p2W=80;
+      const grad2=c2.createLinearGradient(pad2X,H-18,pad2X+p2W,H-18);grad2.addColorStop(0,'#00DDAA');grad2.addColorStop(1,'#00AA88');
+      c2.fillStyle=grad2;c2.beginPath();c2.roundRect(pad2X,H-18,p2W,12,6);c2.fill();
+      c2.fillStyle='rgba(255,255,255,0.3)';c2.fillRect(pad2X+4,H-17,p2W-8,4);
     }
     // balls
     balls.forEach(bl=>{
@@ -1201,8 +1201,8 @@ function startBreakout(){
         bl.dx=Math.max(-maxSpd,Math.min(maxSpd,bl.dx));
         bl.y=H-20-BALL_R;combo=0}
       // extra paddle bounce
-      if(pad2X>=0&&bl.dy>0&&bl.y+BALL_R>=H-60&&bl.y+BALL_R<=H-46&&bl.x>=pad2X-4&&bl.x<=pad2X+100+4){
-        bl.dy=-Math.abs(bl.dy);const off=(bl.x-(pad2X+50))/50;bl.dx+=off*2;const maxSpd=3+level*0.3;bl.dx=Math.max(-maxSpd,Math.min(maxSpd,bl.dx));bl.y=H-60-BALL_R;combo=0}
+      if(pad2X>=0&&bl.dy>0&&bl.y+BALL_R>=H-20&&bl.y+BALL_R<=H-6&&bl.x>=pad2X-4&&bl.x<=pad2X+80+4){
+        bl.dy=-Math.abs(bl.dy);const off=(bl.x-(pad2X+40))/40;bl.dx+=off*2;const maxSpd=3+level*0.3;bl.dx=Math.max(-maxSpd,Math.min(maxSpd,bl.dx));bl.y=H-20-BALL_R;combo=0}
       // ball lost
       if(bl.y>H+20){balls.splice(bi,1);if(balls.length===0){lives--;combo=0;if(lives<=0){over=true}else{resetBalls()}}}
       // brick collision
@@ -1223,7 +1223,7 @@ function startBreakout(){
           }else if(b.a<=0&&b.eff===2){
             explodeBrick(b);
           }else if(b.a<=0&&b.eff===4){
-            pad2X=padX+padW/2-50;spawnParticles(bl.x,bl.y,'#00DDAA',10);
+            pad2X=Math.min(W-80,padX+padW+8);spawnParticles(bl.x,bl.y,'#00DDAA',10);
           }
           const overlapL=bl.x+BALL_R-b.x,overlapR=b.x+b.w-(bl.x-BALL_R);
           const overlapT=bl.y+BALL_R-b.y,overlapB=b.y+b.h-(bl.y-BALL_R);
@@ -1233,7 +1233,7 @@ function startBreakout(){
     }
     for(let i=particles.length-1;i>=0;i--){const p=particles[i];p.x+=p.vx;p.y+=p.vy;p.vy+=0.15;p.life-=0.03;if(p.life<=0)particles.splice(i,1)}}
   function tick(){if(!mgActive){draw();return}upd();draw();if(fc%15===0)drawSideLB2();requestAnimationFrame(tick)}
-  function onK(e){if(over||!mgActive)return;if(e.key==='ArrowLeft'){padX=Math.max(0,padX-30);if(pad2X>=0)pad2X=Math.max(0,pad2X-30);e.preventDefault()}else if(e.key==='ArrowRight'){padX=Math.min(W-padW,padX+30);if(pad2X>=0)pad2X=Math.min(W-100,pad2X+30);e.preventDefault()}}
+  function onK(e){if(over||!mgActive)return;if(e.key==='ArrowLeft'){padX=Math.max(0,padX-30);if(pad2X>=0)pad2X=Math.max(0,pad2X-30);e.preventDefault()}else if(e.key==='ArrowRight'){padX=Math.min(W-padW,padX+30);if(pad2X>=0)pad2X=Math.min(W-80,pad2X+30);e.preventDefault()}}
   document.addEventListener('keydown',onK);const oc=closeMinigame;closeMinigame=function(){document.removeEventListener('keydown',onK);oc()};
   draw();requestAnimationFrame(tick)}
 
