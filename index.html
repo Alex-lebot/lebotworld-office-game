@@ -471,7 +471,7 @@ const EVENTS=[
 ];
 const GEVT={active:null,cd:30,dlgCD:0};
 function triggerEvt(){const ev=EVENTS[Math.floor(Math.random()*EVENTS.length)];GEVT.active={ev,timer:0,dlgCD:0};addFeed('event','<b>'+ev.label+'</b> — '+ev.announce);npcs.forEach((n,i)=>{n.inEvt=true;n.wps=[];n.wi=0;n.mv=false;const tgt=ev.dests[i%ev.dests.length];const fr=gra(n.col,n.row),trr=gra(tgt.col,tgt.row);n.wps=cwp(n.col,fr,tgt.col,tgt.row,trr);n.wi=0;n.st=0;n.state='event'})}
-function updateGEVT(dt){if(!GEVT.active){GEVT.cd-=dt;if(GEVT.cd<=0){GEVT.cd=40+Math.random()*40;if(Math.random()<.4)triggerEvt()}return}const g=GEVT.active;g.timer+=dt;npcs.forEach(n=>{if(n.inEvt&&!n.mv&&n.wi<n.wps.length){const w=n.wps[n.wi];n.tc=w.col;n.tr=w.row;n.mv=true;n.wi++;n.aDoors()}if(n.inEvt&&!n.mv&&n.wi>=n.wps.length){n.st+=dt}});g.dlgCD-=dt;if(g.dlgCD<=0){g.dlgCD=8+Math.random()*6;const n=npcs[Math.floor(Math.random()*npcs.length)];const line=g.ev.dlg[Math.floor(Math.random()*g.ev.dlg.length)];feedChat(n.name,line)}if(g.timer>g.ev.dur){addFeed('event','<b>'+g.ev.label+'</b> 结束了，大家回到各自岗位。');npcs.forEach(n=>{n.inEvt=false;n.state='idle';n.st=0;n.nat=2+Math.random()*3;n.wps=[];n.wi=0;n.mv=false});GEVT.active=null;GEVT.cd=40+Math.random()*40}}
+function updateGEVT(dt){if(!GEVT.active){GEVT.cd-=dt;if(GEVT.cd<=0){GEVT.cd=40+Math.random()*40;if(Math.random()<.4)triggerEvt()}return}const g=GEVT.active;g.timer+=dt;npcs.forEach(n=>{if(n.inEvt&&!n.mv&&n.wi<n.wps.length){const w=n.wps[n.wi];n.tc=w.col;n.tr=w.row;n.mv=true;n.wi++;n.aDoors()}if(n.inEvt&&!n.mv&&n.wi>=n.wps.length){n.st+=dt}});g.dlgCD-=dt;if(g.dlgCD<=0){g.dlgCD=8+Math.random()*6;const n=npcs[Math.floor(Math.random()*npcs.length)];const line=subName(g.ev.dlg[Math.floor(Math.random()*g.ev.dlg.length)]);feedChat(n.name,line)}if(g.timer>g.ev.dur){addFeed('event','<b>'+g.ev.label+'</b> 结束了，大家回到各自岗位。');npcs.forEach(n=>{n.inEvt=false;n.state='idle';n.st=0;n.nat=2+Math.random()*3;n.wps=[];n.wi=0;n.mv=false});GEVT.active=null;GEVT.cd=40+Math.random()*40}}
 
 // ==================== 小游戏系统 ====================
 let mgActive=false;
@@ -1502,8 +1502,8 @@ document.addEventListener('DOMContentLoaded',()=>{
   const btn=document.createElement('button');btn.id='startBtn';btn.className='start-btn2';btn.textContent='进入办公室';
   btn.onclick=()=>{
     if(selectedChar<0)return;
-    PC={body:ALL_CHARS[selectedChar].body,dark:ALL_CHARS[selectedChar].dark,light:ALL_CHARS[selectedChar].light};
-    document.getElementById('title-screen').style.display='none';started=true;lastT=performance.now()};
+    document.getElementById('title-screen').style.display='none';started=true;
+    initGame();lastT=performance.now()};
   sel.parentNode.insertBefore(btn,sel.nextSibling)});
 
 // ==================== 角色切换 ====================
@@ -1559,8 +1559,10 @@ function initGame(){
     npcs.push(new NPC(s.col,s.row,{body:ch.body,dark:ch.dark,light:ch.light},ch.name,ch.title,npcs.length))});
   DD.meeting_corridor.open=true;DD.meeting_corridor.anim=1;DD.robot_lab_corridor.open=true;DD.robot_lab_corridor.anim=1;
   ap.lastInput=performance.now();
-  if(feedData.length>0){loadSavedFeed();addFeed('event','<b>'+pc.name+'</b> 回到了 <b>LebotWorld</b>！')}
-  else{addFeed('event','欢迎 <b>'+pc.name+'</b> 来到 <b>LebotWorld</b>！让每个孩子成为AI时代的原住民！')}
+  if(started){
+    if(feedData.length>0){loadSavedFeed();addFeed('event','<b>'+pc.name+'</b> 回到了 <b>LebotWorld</b>！')}
+    else{addFeed('event','欢迎 <b>'+pc.name+'</b> 来到 <b>LebotWorld</b>！让每个孩子成为AI时代的原住民！')}
+  }
 }
 
 // ==================== 输入 ====================
