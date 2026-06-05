@@ -797,19 +797,6 @@ function startPacman(){
     c2.fillStyle='#FF0';c2.beginPath();c2.arc(cx+16,cy-3,2,0,Math.PI*2);c2.fill();
   }
   function drawCrow(cr){drawCrowAt(cr.x,cr.y)}
-    // body
-    c2.beginPath();c2.ellipse(cx,cy,16,8,0,0,Math.PI*2);c2.fill();
-    // wings
-    const wf=Math.sin(Date.now()*0.012+cr.phase)*12;
-    c2.beginPath();c2.moveTo(cx-8,cy);c2.lineTo(cx-22,cy-10+wf);c2.lineTo(cx-14,cy+2);c2.closePath();c2.fill();
-    c2.beginPath();c2.moveTo(cx+8,cy);c2.lineTo(cx+22,cy-10-wf);c2.lineTo(cx+14,cy+2);c2.closePath();c2.fill();
-    // head
-    c2.beginPath();c2.arc(cx+14,cy-2,5,0,Math.PI*2);c2.fill();
-    // beak
-    c2.fillStyle='#FF8800';c2.beginPath();c2.moveTo(cx+19,cy-2);c2.lineTo(cx+26,cy);c2.lineTo(cx+19,cy+2);c2.closePath();c2.fill();
-    // eye
-    c2.fillStyle='#FF0';c2.beginPath();c2.arc(cx+16,cy-3,2,0,Math.PI*2);c2.fill();
-  }
 
   function drawClouds(){
     clouds.forEach(cl=>{
