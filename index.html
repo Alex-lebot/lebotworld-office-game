@@ -552,6 +552,21 @@ function showLeaderboard(game,playerScore){
   cbtn.textContent='返回';cbtn.onclick=closeMinigame;btns.appendChild(cbtn);box.appendChild(btns)}
 
 function openMinigame(title,contentFn){mgActive=true;document.getElementById('mgTitle').textContent=title;document.getElementById('mgContent').innerHTML='';document.getElementById('minigame-overlay').classList.add('active');contentFn()}
+function showGameSelect(){
+  const games=[{name:'机器人跑酷',emoji:'🤖',desc:'无尽跑酷冒险',fn:startPacman},{name:'打砖块',emoji:'🧱',desc:'弹球消除砖块',fn:startBreakout},{name:'贪吃蛇',emoji:'🐍',desc:'吃食物变长',fn:startSnake},{name:'排行榜',emoji:'🏆',desc:'查看最佳成绩',fn:()=>{closeMinigame();setTimeout(()=>openMinigame('🏆 排行榜',showAllLeaderboard),120)}}];
+  const box=document.getElementById('mgContent');box.innerHTML='';
+  const grid=document.createElement('div');grid.style.cssText='display:flex;gap:12px;flex-wrap:wrap;justify-content:center';
+  games.forEach(g=>{
+    const card=document.createElement('div');card.style.cssText='width:120px;padding:18px 12px;border-radius:14px;background:rgba(255,255,255,0.06);border:2px solid rgba(255,255,255,0.1);cursor:pointer;text-align:center;transition:all .2s';
+    card.innerHTML='<div style="font-size:36px;margin-bottom:8px">'+g.emoji+'</div><div style="color:#fff;font-size:14px;font-weight:700;margin-bottom:4px">'+g.name+'</div><div style="color:rgba(255,255,255,0.4);font-size:11px">'+g.desc+'</div>';
+    card.onmouseenter=()=>{card.style.transform='translateY(-4px)';card.style.borderColor='rgba(74,144,217,0.5)'};
+    card.onmouseleave=()=>{card.style.transform='';card.style.borderColor='rgba(255,255,255,0.1)'};
+    card.onclick=()=>{closeMinigame();setTimeout(()=>openMinigame(g.emoji+' '+g.name,g.fn),120)};
+    grid.appendChild(card)});
+  box.appendChild(grid);
+  document.getElementById('mgTitle').textContent='🎮 选择游戏';
+  document.getElementById('minigame-overlay').classList.add('active');mgActive=true;
+}
 
 // ==================== 机器人跑酷 ====================
 function startPacman(){
