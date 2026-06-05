@@ -568,8 +568,8 @@ function startPacman(){
   let speed=350,score=0,hiScore=0,lives=3,level=1,over=false,lbShown=false;
   let started=false,nightMode=false,nightAlpha=0;
 
-  let dino={x:80,y:GY,vy:0,ducking:false,jumping:false,frame:0,frameT:0,invT:0};
-  const DINO_W=44,DINO_H=48,DINO_DUCK_W=58,DINO_DUCK_H=28;
+  let dino={x:80,y:GY,vy:0,jumping:false,frame:0,frameT:0,invT:0};
+  const DINO_W=44,DINO_H=48;
 
   let obstacles=[],obsCD=1.5;
   let groundX=0;
@@ -587,16 +587,12 @@ function startPacman(){
     if(level>=2)types.push({type:'rock',w:36,h:30});
     if(level>=2)types.push({type:'bird',w:42,h:30,fly:true,flyY:GY-70});
     if(level>=3)types.push({type:'bird',w:42,h:30,fly:true,flyY:GY-130});
-    if(level>=4)types.push({type:'bird',w:42,h:30,fly:true,flyY:GY-40});
     if(level>=5)types.push({type:'double_cactus',w:45,h:60});
     const t=types[Math.floor(Math.random()*types.length)];
     obstacles.push({x:W+20,y:t.fly?t.flyY:GY,...t,passed:false});
   }
 
-  function dinoHitbox(){
-    if(dino.ducking)return{x:dino.x,y:dino.y-DINO_DUCK_H,w:DINO_DUCK_W,h:DINO_DUCK_H};
-    return{x:dino.x,y:dino.y-DINO_H,w:DINO_W,h:DINO_H};
-  }
+  function dinoHitbox(){return{x:dino.x,y:dino.y-DINO_H,w:DINO_W,h:DINO_H}}
   function obsHitbox(o){return{x:o.x,y:o.y-o.h,w:o.w,h:o.h}}
   function collides(a,b){return a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y}
 
@@ -615,14 +611,7 @@ function startPacman(){
     if(inv&&Math.floor(dino.invT*10)%2===0)return;
     const dx=dino.x,dy=dino.y;
     c2.fillStyle=nightMode?'#E0E0E0':'#535353';
-    if(dino.ducking){
-      c2.fillRect(dx,dy-DINO_DUCK_H,DINO_DUCK_W,DINO_DUCK_H);
-      c2.fillStyle='#FFF';c2.fillRect(dx+DINO_DUCK_W-14,dy-DINO_DUCK_H+6,8,8);
-      c2.fillStyle='#000';c2.fillRect(dx+DINO_DUCK_W-10,dy-DINO_DUCK_H+8,4,4);
-      c2.fillStyle=nightMode?'#E0E0E0':'#535353';
-      c2.fillRect(dx+10,dy,6,8);c2.fillRect(dx+28,dy,6,8);
-    }else{
-      c2.fillRect(dx+10,dy-DINO_H,28,DINO_H-10);
+    c2.fillRect(dx+10,dy-DINO_H,28,DINO_H-10);
       c2.fillRect(dx+20,dy-DINO_H-14,24,20);
       c2.fillStyle='#FFF';c2.fillRect(dx+34,dy-DINO_H-10,8,8);
       c2.fillStyle='#000';c2.fillRect(dx+38,dy-DINO_H-8,4,4);
@@ -640,7 +629,6 @@ function startPacman(){
         c2.fillRect(dx+(lf?14:16),dy,6,lf?12:8);
         c2.fillRect(dx+(lf?28:26),dy,6,lf?8:12);
       }
-    }
   }
 
   function drawObstacle(o){
@@ -723,7 +711,7 @@ function startPacman(){
     c2.fillStyle=nightMode?'#DDD':'#535353';c2.font='bold 28px "Courier New",monospace';c2.textAlign='center';
     c2.fillText('按 空格 或 ↑ 开始',W/2,H/2-20);
     c2.font='14px "Courier New",monospace';c2.fillStyle=nightMode?'#AAA':'#888';
-    c2.fillText('↑ / 空格 = 跳跃    ↓ = 蹲下',W/2,H/2+20);
+    c2.fillText('↑ / 空格 = 跳跃',W/2,H/2+20);
   }
 
   function drawGameOver(){
@@ -755,7 +743,7 @@ function startPacman(){
   drawSideLB();
 
   function reset(){
-    dino={x:80,y:GY,vy:0,ducking:false,jumping:false,frame:0,frameT:0,invT:0};
+    dino={x:80,y:GY,vy:0,jumping:false,frame:0,frameT:0,invT:0};
     obstacles=[];obsCD=1.5;speed=350;score=0;lives=3;level=1;
     over=false;lbShown=false;started=true;
     particles=[];groundX=0;nightMode=false;nightAlpha=0;
@@ -867,21 +855,17 @@ function startPacman(){
   function onK(e){
     if(!mgActive)return;
     const k=e.key;
-    if(k==='ArrowDown'){
-      e.preventDefault();
-      if(started&&!over&&!dino.jumping)dino.ducking=true;
-    }
     if(k==='ArrowUp'||k===' '){
       e.preventDefault();
       if(!started){reset();return}
       if(over){reset();return}
       if(!dino.jumping){
-        dino.jumping=true;dino.vy=JUMP_VEL;dino.ducking=false;
+        dino.jumping=true;dino.vy=JUMP_VEL;
         addParticle(dino.x+20,GY,'rgba(150,150,150,0.6)',5);
       }
     }
   }
-  function onKU(e){if(e.key==='ArrowDown')dino.ducking=false}
+  function onKU(e){}
   document.addEventListener('keydown',onK);
   document.addEventListener('keyup',onKU);
   const oc=closeMinigame;closeMinigame=function(){document.removeEventListener('keydown',onK);document.removeEventListener('keyup',onKU);oc()};
